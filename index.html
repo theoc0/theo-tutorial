@@ -79,6 +79,11 @@
       color: #f87171;
       font-weight: bold;
     }
+    .teacher-status {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #94a3b8;
+    }
   </style>
 </head>
 <body>
@@ -107,7 +112,12 @@
         <button onclick="startGame()">開始闖關</button>
         <button class="secondary" onclick="downloadBlankPDFLike()">下載學生作答PDF內容（列印版）</button>
         <button class="secondary" onclick="resetProgress()">重設解鎖進度</button>
-        <button class="secondary" onclick="toggleTeacherPanel()">教師後台</button>
+        <button class="secondary" onclick="handleTeacherPanelAccess()">教師後台</button>
+        <button class="secondary" onclick="teacherLogout()">教師登出</button>
+      </div>
+
+      <div class="teacher-status" id="teacherStatus">
+        教師後台狀態：未登入
       </div>
 
       <div class="footer">
@@ -116,7 +126,7 @@
         2. 完成後可查看正確答案及自己是否答對。<br>
         3. 可列印作答紙並另存為 PDF。<br>
         4. 解鎖進度與歷史紀錄保存在瀏覽器本機。<br>
-        5. 教師後台可查看學生成績及錯題紀錄（需配合最新版 app.js）。
+        5. 教師後台已加入密碼保護。
       </div>
     </div>
 
@@ -223,202 +233,5 @@
 
   <script src="questions.js"></script>
   <script src="app.js"></script>
-  <script>
-    function toggleTeacherPanel() {
-      const panel = document.getElementById("teacherPanel");
-      if (panel.classList.contains("hidden-admin")) {
-        panel.classList.remove("hidden-admin");
-        renderTeacherSummary();
-        populateTeacherStudentSelect();
-      } else {
-        panel.classList.add("hidden-admin");
-      }
-    }
-
-    function showTeacherTab(tab) {
-      document.getElementById("teacherSummaryTab").classList.toggle("hidden", tab !== "summary");
-      document.getElementById("teacherDetailTab").classList.toggle("hidden", tab !== "detail");
-      document.getElementById("tabSummaryBtn").classList.toggle("active", tab === "summary");
-      document.getElementById("tabDetailBtn").classList.toggle("active", tab === "detail");
-      if (tab === "summary") renderTeacherSummary();
-      if (tab === "detail") {
-        populateTeacherStudentSelect();
-        renderTeacherDetail();
-      }
-    }
-
-    function getTeacherHistory() {
-      try {
-        return JSON.parse(localStorage.getItem("zhGameHistory") || "[]");
-      } catch(e) {
-        return [];
-      }
-    }
-
-    function renderTeacherSummary() {
-      const body = document.getElementById("teacherSummaryBody");
-      const search = (document.getElementById("teacherSearchName").value || "").trim().toLowerCase();
-      const filter = document.getElementById("teacherFilterPass").value;
-      const history = getTeacherHistory();
-
-      let rows = history.filter(h => {
-        const matchName = !search || (h.player || "").toLowerCase().includes(search);
-        const matchPass =
-          filter === "all" ||
-          (filter === "pass" && h.passed) ||
-          (filter === "fail" && !h.passed);
-        return matchName && matchPass;
-      });
-
-      if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="7">沒有符合條件的紀錄。</td></tr>`;
-        return;
-      }
-
-      body.innerHTML = rows.map((h, i) => `
-        <tr>
-          <td>${i + 1}</td>
-          <td>${escapeHtml(h.player || "")}</td>
-          <td>Lv ${h.level}</td>
-          <td>${h.score}/${h.total}</td>
-          <td>${h.passed ? '<span class="pill-pass">過關</span>' : '<span class="pill-fail">未過關</span>'}</td>
-          <td>${escapeHtml(h.timeUsed || "")}</td>
-          <td>${escapeHtml(h.date || "")}</td>
-        </tr>
-      `).join("");
-    }
-
-    function populateTeacherStudentSelect() {
-      const sel = document.getElementById("teacherStudentSelect");
-      const history = getTeacherHistory();
-      sel.innerHTML = "";
-
-      if (!history.length) {
-        const op = document.createElement("option");
-        op.value = "";
-        op.textContent = "尚未有學生紀錄";
-        sel.appendChild(op);
-        return;
-      }
-
-      history.forEach((h, i) => {
-        const op = document.createElement("option");
-        op.value = i;
-        op.textContent = `${h.player}｜Lv ${h.level}｜${h.score}/${h.total}｜${h.date}`;
-        sel.appendChild(op);
-      });
-    }
-
-    function renderTeacherDetail() {
-      const area = document.getElementById("teacherDetailArea");
-      const sel = document.getElementById("teacherStudentSelect");
-      const history = getTeacherHistory();
-
-      if (!history.length || !sel.value) {
-        area.innerHTML = "請先選擇一條學生紀錄。";
-        return;
-      }
-
-      const idx = parseInt(sel.value, 10);
-      const h = history[idx];
-      if (!h) {
-        area.innerHTML = "找不到相關紀錄。";
-        return;
-      }
-
-      let wrongHtml = "";
-      if (h.responses && h.responses.length) {
-        const wrongs = h.responses.filter(r => !r.correct);
-        if (!wrongs.length) {
-          wrongHtml = `<div class="teacher-box"><strong>錯題：</strong>本次全部答對或沒有錯題紀錄。</div>`;
-        } else {
-          wrongHtml = wrongs.map((r, i) => `
-            <div class="wrong-q">
-              <strong>錯題 ${i + 1}</strong><br>
-              <strong>課文 / 類型：</strong>${escapeHtml(r.cat || "")} / ${escapeHtml(r.type || "")}<br>
-              <strong>題目：</strong>${escapeHtml(r.question || "")}<br>
-              <strong>學生答案：</strong>${escapeHtml(r.studentAnswer || "未作答")}<br>
-              <strong>正確答案：</strong>${escapeHtml(r.correctAnswer || "")}<br>
-              <strong>解說：</strong>${escapeHtml(r.explanation || "")}
-            </div>
-          `).join("");
-        }
-      } else {
-        wrongHtml = `<div class="teacher-box"><strong>提示：</strong>目前這筆紀錄未包含逐題作答資料。請套用最新版 app.js 補丁。</div>`;
-      }
-
-      area.innerHTML = `
-        <div class="teacher-meta">
-          <strong>角色名：</strong>${escapeHtml(h.player || "")}<br>
-          <strong>等級：</strong>Lv ${h.level}<br>
-          <strong>得分：</strong>${h.score}/${h.total}<br>
-          <strong>狀態：</strong>${h.passed ? '<span class="pill-pass">過關</span>' : '<span class="pill-fail">未過關</span>'}<br>
-          <strong>作答時間：</strong>${escapeHtml(h.timeUsed || "")}<br>
-          <strong>日期：</strong>${escapeHtml(h.date || "")}
-        </div>
-        <h3>錯題詳情</h3>
-        ${wrongHtml}
-      `;
-    }
-
-    function printTeacherSummary() {
-      const body = document.getElementById("teacherSummaryBody").innerHTML;
-      const html = `
-        <html>
-        <head>
-          <title>教師成績總覽</title>
-          <style>
-            body{font-family:"Microsoft JhengHei",sans-serif;padding:24px;line-height:1.8}
-            table{width:100%;border-collapse:collapse}
-            th,td{border:1px solid #666;padding:8px;text-align:left}
-            th{background:#eee}
-            @media print { button{display:none} }
-          </style>
-        </head>
-        <body>
-          <h1>教師成績總覽</h1>
-          <table>
-            <thead>
-              <tr>
-                <th>#</th><th>角色名</th><th>等級</th><th>得分</th><th>狀態</th><th>作答時間</th><th>日期</th>
-              </tr>
-            </thead>
-            <tbody>${body}</tbody>
-          </table>
-          <button onclick="window.print()">列印 / 另存為 PDF</button>
-        </body>
-        </html>
-      `;
-      const w = window.open("", "_blank");
-      w.document.write(html);
-      w.document.close();
-      w.focus();
-    }
-
-    function printTeacherDetail() {
-      const detail = document.getElementById("teacherDetailArea").innerHTML;
-      const html = `
-        <html>
-        <head>
-          <title>教師查看學生錯題</title>
-          <style>
-            body{font-family:"Microsoft JhengHei",sans-serif;padding:24px;line-height:1.8}
-            .box{border:1px solid #666;padding:12px;margin:12px 0;border-radius:8px}
-            @media print { button{display:none} }
-          </style>
-        </head>
-        <body>
-          <h1>教師查看學生錯題</h1>
-          <div class="box">${detail}</div>
-          <button onclick="window.print()">列印 / 另存為 PDF</button>
-        </body>
-        </html>
-      `;
-      const w = window.open("", "_blank");
-      w.document.write(html);
-      w.document.close();
-      w.focus();
-    }
-  </script>
 </body>
 </html>
