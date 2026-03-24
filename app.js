@@ -56,6 +56,7 @@ function changeQuestionBank() {
   initLevels();
   renderHistory();
   updateCurrentBankLabel();
+  renderBankStatus();
 
   if (isTeacherLoggedIn()) {
     renderTeacherSummary();
@@ -74,7 +75,89 @@ function updateCurrentBankLabel() {
 }
 
 /* =========================
-   儲存 key
+   題庫完整性檢查
+========================= */
+function validateCurrentBank() {
+  const bankName = getCurrentBankName();
+  const bank = getCurrentQuestionBank();
+
+  if (!Array.isArray(bank) || bank.length === 0) {
+    return {
+      ok: false,
+      message: `題庫「${bankName}」沒有任何題目。`
+    };
+  }
+
+  if (bank.length < QUESTIONS_PER_LEVEL) {
+    return {
+      ok: false,
+      message: `題庫「${bankName}」目前只有 ${bank.length} 題，不足 ${QUESTIONS_PER_LEVEL} 題，暫時不能開啟闖關。`
+    };
+  }
+
+  const requiredCats = ["水調歌頭", "孔明借箭", "最苦與最樂", "人間有情", "語文運用"];
+  const requiredTypes = ["體裁", "文言字詞", "閱讀理解"];
+  const requiredLangTypes = ["單元五", "單元六", "單元七"];
+
+  for (const cat of requiredCats) {
+    const hasCat = bank.some(q => q.cat === cat);
+    if (!hasCat) {
+      return {
+        ok: false,
+        message: `題庫「${bankName}」缺少分類：${cat}`
+      };
+    }
+  }
+
+  for (const cat of ["水調歌頭", "孔明借箭", "最苦與最樂", "人間有情"]) {
+    for (const type of requiredTypes) {
+      const hasType = bank.some(q => q.cat === cat && q.type === type);
+      if (!hasType) {
+        return {
+          ok: false,
+          message: `題庫「${bankName}」在「${cat}」中缺少題型：${type}`
+        };
+      }
+    }
+  }
+
+  for (const type of requiredLangTypes) {
+    const hasType = bank.some(q => q.cat === "語文運用" && q.type === type);
+    if (!hasType) {
+      return {
+        ok: false,
+        message: `題庫「${bankName}」缺少語文運用分類：${type}`
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    message: `題庫「${bankName}」可正常使用，共 ${bank.length} 題。`
+  };
+}
+
+function renderBankStatus() {
+  let box = document.getElementById("bankStatus");
+  const startPanel = document.getElementById("startPanel");
+
+  if (!box && startPanel) {
+    box = document.createElement("div");
+    box.id = "bankStatus";
+    box.className = "teacher-status";
+    startPanel.appendChild(box);
+  }
+
+  if (!box) return;
+
+  const result = validateCurrentBank();
+  box.innerHTML = result.ok
+    ? `題庫狀態：<span class="correct">${escapeHtml(result.message)}</span>`
+    : `題庫狀態：<span class="wrong">${escapeHtml(result.message)}</span>`;
+}
+
+/* =========================
+   Storage Keys
 ========================= */
 function getUnlockedKey() {
   return `zhGameUnlocked_${getCurrentBankName()}`;
@@ -231,6 +314,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initLevels();
   renderHistory();
   updateTeacherStatus();
+  renderBankStatus();
 });
 
 /* =========================
@@ -255,7 +339,7 @@ function initLevels() {
 }
 
 /* =========================
-   首頁歷史紀錄
+   歷史紀錄
 ========================= */
 function renderHistory() {
   const area = document.getElementById("historyArea");
@@ -369,6 +453,7 @@ function renderTeacherDetail() {
   let wrongHtml = "";
   if (h.responses && h.responses.length) {
     const wrongs = h.responses.filter(r => !r.correct);
+
     if (!wrongs.length) {
       wrongHtml = `<div class="teacher-box"><strong>錯題：</strong>本次全部答對或沒有錯題紀錄。</div>`;
     } else {
@@ -640,7 +725,6 @@ function updateTimerDisplay() {
   if (!el) return;
 
   el.textContent = formatTime(timeLeft);
-
   if (timeLeft <= 300) el.style.color = "#ef4444";
   else if (timeLeft <= 900) el.style.color = "#f59e0b";
   else el.style.color = "";
@@ -654,6 +738,13 @@ function getUsedTimeText() {
    開始遊戲
 ========================= */
 function startGame() {
+  const validation = validateCurrentBank();
+  if (!validation.ok) {
+    alert(validation.message);
+    renderBankStatus();
+    return;
+  }
+
   const nameInput = document.getElementById("playerName");
   const levelSelect = document.getElementById("levelSelect");
 
@@ -674,6 +765,11 @@ function startGame() {
   currentLevel = level;
   currentSet = buildQuestionSet(level);
   answered = false;
+
+  if (!currentSet.length || currentSet.length < QUESTIONS_PER_LEVEL) {
+    alert("題庫題目不足，無法正常開始本關。請更換題庫或補充題目。");
+    return;
+  }
 
   document.getElementById("startPanel").classList.add("hidden");
   document.getElementById("gamePanel").classList.remove("hidden");
@@ -698,7 +794,6 @@ function startGame() {
   resultPanel.innerHTML = "";
 
   startTimer();
-
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -712,6 +807,7 @@ function backHome() {
   initLevels();
   renderHistory();
   updateCurrentBankLabel();
+  renderBankStatus();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -885,7 +981,7 @@ function goNextLevel() {
 }
 
 /* =========================
-   PDF
+   PDF / 列印
 ========================= */
 function openPrintWindow(html) {
   const w = window.open("", "_blank");
@@ -910,6 +1006,12 @@ function basePrintCSS() {
 }
 
 function downloadBlankPDFLike() {
+  const validation = validateCurrentBank();
+  if (!validation.ok) {
+    alert(validation.message);
+    return;
+  }
+
   const nameInput = document.getElementById("playerName");
   const levelSelect = document.getElementById("levelSelect");
 
@@ -989,7 +1091,7 @@ function downloadAnswerSheetWithResponses() {
 }
 
 /* =========================
-   HTML 安全
+   HTML安全
 ========================= */
 function escapeHtml(str) {
   return String(str)
