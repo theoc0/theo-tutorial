@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>中三中文闖關王 Lv1-100</title>
+  <meta name="description" content="中三中國語文闖關遊戲，涵蓋《水調歌頭》、《孔明借箭》、《最苦與最樂》、《人間有情》及語文運用。" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+
+    <div class="panel" id="startPanel">
+      <h1>中三中文闖關王 Lv1 - 100</h1>
+      <p class="sub">
+        範圍包括：《水調歌頭》、《孔明借箭》、《最苦與最樂》、《人間有情》及單元五、六、七語文運用。<br>
+        每關約 30 題，全為選擇題，設計為約 1 小時完成。輸入角色名後開始闖關。
+      </p>
+
+      <div class="row mt">
+        <div class="col">
+          <label>角色名</label>
+          <input type="text" id="playerName" placeholder="請輸入你的角色名，例如：小狀元" />
+        </div>
+        <div class="col">
+          <label>選擇等級</label>
+          <select id="levelSelect"></select>
+        </div>
+      </div>
+
+      <div class="row mt">
+        <button onclick="startGame()">開始闖關</button>
+        <button class="secondary" onclick="downloadBlankPDFLike()">下載學生作答PDF內容（列印版）</button>
+        <button class="secondary" onclick="resetProgress()">重設解鎖進度</button>
+      </div>
+
+      <div class="footer">
+        說明：<br>
+        1. 每次開始會從題庫隨機抽題，但會涵蓋所有指定範圍。<br>
+        2. 完成後可查看正確答案及自己是否答對。<br>
+        3. 「下載學生作答PDF內容」會開啟可列印頁面，你可在瀏覽器中選擇「列印 / 另存為 PDF」。<br>
+        4. 解鎖進度會保存在瀏覽器本機。
+      </div>
+    </div>
+
+    <div class="panel hidden" id="gamePanel">
+      <div class="topbar">
+        <div>
+          <h2 id="gameTitle">闖關中</h2>
+          <div class="small" id="gameSub"></div>
+        </div>
+        <div class="row">
+          <div class="stat"><div class="k">等級</div><div class="v" id="statLevel">1</div></div>
+          <div class="stat"><div class="k">題目</div><div class="v" id="statCount">30</div></div>
+          <div class="stat"><div class="k">建議時間</div><div class="v">60分</div></div>
+        </div>
+      </div>
+
+      <div class="mt">
+        <div class="small">完成進度</div>
+        <div class="progress"><div id="progressBar"></div></div>
+      </div>
+
+      <div id="quizArea"></div>
+
+      <div class="row mt">
+        <button class="success" onclick="submitLevel()">提交答案</button>
+        <button class="secondary" onclick="backHome()">返回主頁</button>
+        <button class="secondary" onclick="downloadBlankPDFLike()">下載本關作答PDF內容</button>
+      </div>
+
+      <div id="resultPanel" class="summary hidden"></div>
+    </div>
+
+  </div>
+
+  <script src="questions.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
