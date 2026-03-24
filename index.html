@@ -3,15 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>中三中文闖關王 Lv1-100</title>
-  <meta name="description" content="中三中國語文闖關遊戲，涵蓋《水調歌頭》、《孔明借箭》、《最苦與最樂》、《人間有情》及語文運用。" />
+  <title>中文闖關遊戲</title>
+  <meta name="description" content="中文闖關遊戲，支援多題庫切換、教師後台、錯題分析、倒數計時與 PDF 列印。" />
   <link rel="stylesheet" href="style.css" />
   <style>
-    .admin-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 14px;
-    }
     .admin-tools {
       display: flex;
       flex-wrap: wrap;
@@ -84,6 +79,11 @@
       font-size: 14px;
       color: #94a3b8;
     }
+    .bank-label {
+      margin-top: 8px;
+      color: #cbd5e1;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -91,13 +91,18 @@
 
     <!-- 首頁 -->
     <div class="panel" id="startPanel">
-      <h1>中三中文闖關王 Lv1 - 100</h1>
+      <h1>中文闖關遊戲</h1>
       <p class="sub">
-        範圍包括：《水調歌頭》、《孔明借箭》、《最苦與最樂》、《人間有情》及單元五、六、七語文運用。<br>
-        每關約 30 題，全為選擇題，設計為約 1 小時完成。輸入角色名後開始闖關。
+        本遊戲支援多題庫切換、闖關模式、教師後台、成績分析與錯題紀錄。<br>
+        每關約 30 題，全為選擇題，建議於 1 小時內完成。
       </p>
 
       <div class="row mt">
+        <div class="col">
+          <label>選擇題庫</label>
+          <select id="bankSelect" onchange="changeQuestionBank()"></select>
+          <div class="bank-label" id="currentBankLabel">目前題庫：--</div>
+        </div>
         <div class="col">
           <label>角色名</label>
           <input type="text" id="playerName" placeholder="請輸入你的角色名，例如：小狀元" />
@@ -109,9 +114,9 @@
       </div>
 
       <div class="row mt">
-        <button onclick="startGame()">開始闖關</button>
+        <button onclick="startGame()">開始遊戲</button>
         <button class="secondary" onclick="downloadBlankPDFLike()">下載學生作答PDF內容（列印版）</button>
-        <button class="secondary" onclick="resetProgress()">重設解鎖進度</button>
+        <button class="secondary" onclick="resetProgress()">重設當前題庫解鎖進度</button>
         <button class="secondary" onclick="handleTeacherPanelAccess()">教師後台</button>
         <button class="secondary" onclick="teacherLogout()">教師登出</button>
       </div>
@@ -122,29 +127,28 @@
 
       <div class="footer">
         說明：<br>
-        1. 每次開始會從題庫隨機抽題，但會涵蓋所有指定範圍。<br>
-        2. 完成後可查看正確答案及自己是否答對。<br>
-        3. 可列印作答紙並另存為 PDF。<br>
-        4. 解鎖進度與歷史紀錄保存在瀏覽器本機。<br>
-        5. 教師後台已加入密碼保護。
+        1. 請先選擇題庫，再輸入角色名及選擇等級。<br>
+        2. 不同題庫的進度與歷史紀錄會分開儲存。<br>
+        3. 每關 30 題，倒數 60 分鐘，時間到自動交卷。<br>
+        4. 教師後台已加入密碼保護。
       </div>
     </div>
 
     <!-- 歷史紀錄 -->
     <div class="panel" id="historyPanel">
-      <h2>歷史成績紀錄</h2>
+      <h2>歷史成績紀錄（當前題庫）</h2>
       <div id="historyArea" class="small">尚未有紀錄。</div>
       <div style="margin-top:12px">
-        <button class="secondary" onclick="clearHistory()">清除歷史紀錄</button>
+        <button class="secondary" onclick="clearHistory()">清除當前題庫歷史紀錄</button>
       </div>
     </div>
 
     <!-- 教師後台 -->
     <div class="panel hidden-admin" id="teacherPanel">
-      <h2>教師後台</h2>
+      <h2>教師後台（當前題庫）</h2>
       <p class="sub">
-        可查閱學生歷史成績、過關情況及錯題紀錄。<br>
-        注意：資料儲存在本瀏覽器本機，如清除瀏覽器資料會一併清除。
+        可查閱當前題庫的學生歷史成績、過關情況及錯題紀錄。<br>
+        資料按題庫分開儲存。
       </p>
 
       <div class="tab-buttons">
@@ -152,7 +156,6 @@
         <button id="tabDetailBtn" onclick="showTeacherTab('detail')">學生詳情 / 錯題</button>
       </div>
 
-      <!-- 成績總覽 -->
       <div id="teacherSummaryTab">
         <div class="admin-tools">
           <input type="text" id="teacherSearchName" placeholder="搜尋角色名" style="max-width:220px;">
@@ -185,7 +188,6 @@
         </div>
       </div>
 
-      <!-- 學生詳情 -->
       <div id="teacherDetailTab" class="hidden">
         <div class="admin-tools">
           <select id="teacherStudentSelect" style="min-width:280px;"></select>
@@ -206,6 +208,7 @@
           <div class="small" id="gameSub"></div>
         </div>
         <div class="row">
+          <div class="stat"><div class="k">題庫</div><div class="v" id="statBank" style="font-size:14px;">--</div></div>
           <div class="stat"><div class="k">等級</div><div class="v" id="statLevel">1</div></div>
           <div class="stat"><div class="k">題目</div><div class="v" id="statCount">30</div></div>
           <div class="stat"><div class="k">建議時間</div><div class="v">60分</div></div>
@@ -231,7 +234,7 @@
 
   </div>
 
-  <script src="questions.js"></script>
+  <script src="question-banks.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
