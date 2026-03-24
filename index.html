@@ -84,6 +84,20 @@
       color: #cbd5e1;
       font-size: 14px;
     }
+    .bank-status-box {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      background: #0b1220;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+    .bank-help {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #94a3b8;
+    }
   </style>
 </head>
 <body>
@@ -102,6 +116,9 @@
           <label>選擇題庫</label>
           <select id="bankSelect" onchange="changeQuestionBank()"></select>
           <div class="bank-label" id="currentBankLabel">目前題庫：--</div>
+          <div class="bank-help">
+            請先選擇題庫，再輸入角色名與等級。
+          </div>
         </div>
         <div class="col">
           <label>角色名</label>
@@ -111,6 +128,11 @@
           <label>選擇等級</label>
           <select id="levelSelect"></select>
         </div>
+      </div>
+
+      <!-- 題庫狀態提示 -->
+      <div id="bankStatus" class="bank-status-box">
+        題庫狀態：檢查中……
       </div>
 
       <div class="row mt">
@@ -130,7 +152,8 @@
         1. 請先選擇題庫，再輸入角色名及選擇等級。<br>
         2. 不同題庫的進度與歷史紀錄會分開儲存。<br>
         3. 每關 30 題，倒數 60 分鐘，時間到自動交卷。<br>
-        4. 教師後台已加入密碼保護。
+        4. 若題庫狀態顯示不可用，請更換題庫。<br>
+        5. 教師後台已加入密碼保護。
       </div>
     </div>
 
