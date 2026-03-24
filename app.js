@@ -1,18 +1,90 @@
 const TOTAL_LEVELS = 100;
 const QUESTIONS_PER_LEVEL = 30;
-const QUIZ_TIME_SECONDS = 60 * 60; // 60分鐘
+const QUIZ_TIME_SECONDS = 60 * 60;
 const TEACHER_PASSWORD = "teacher2026";
 
 let currentLevel = 1;
 let player = "";
 let currentSet = [];
 let answered = false;
-
 let timer = null;
 let timeLeft = QUIZ_TIME_SECONDS;
 
 /* =========================
-   教師登入狀態
+   題庫管理
+========================= */
+function getAvailableBanks() {
+  return Object.keys(QUESTION_BANKS || {});
+}
+
+function getCurrentBankName() {
+  return localStorage.getItem("zhCurrentBank") || "中三啟思教科書學生";
+}
+
+function setCurrentBankName(name) {
+  localStorage.setItem("zhCurrentBank", name);
+}
+
+function getCurrentQuestionBank() {
+  return QUESTION_BANKS[getCurrentBankName()] || [];
+}
+
+function initBankSelect() {
+  const sel = document.getElementById("bankSelect");
+  if (!sel) return;
+
+  const banks = getAvailableBanks();
+  const current = getCurrentBankName();
+  sel.innerHTML = "";
+
+  banks.forEach(name => {
+    const op = document.createElement("option");
+    op.value = name;
+    op.textContent = name;
+    if (name === current) op.selected = true;
+    sel.appendChild(op);
+  });
+
+  updateCurrentBankLabel();
+}
+
+function changeQuestionBank() {
+  const sel = document.getElementById("bankSelect");
+  if (!sel) return;
+
+  setCurrentBankName(sel.value);
+  initLevels();
+  renderHistory();
+  updateCurrentBankLabel();
+
+  if (isTeacherLoggedIn()) {
+    renderTeacherSummary();
+    populateTeacherStudentSelect();
+    renderTeacherDetail();
+  }
+}
+
+function updateCurrentBankLabel() {
+  const label = document.getElementById("currentBankLabel");
+  const stat = document.getElementById("statBank");
+  const name = getCurrentBankName();
+
+  if (label) label.textContent = `目前題庫：${name}`;
+  if (stat) stat.textContent = name;
+}
+
+/* =========================
+   儲存 key
+========================= */
+function getUnlockedKey() {
+  return `zhGameUnlocked_${getCurrentBankName()}`;
+}
+function getHistoryKey() {
+  return `zhGameHistory_${getCurrentBankName()}`;
+}
+
+/* =========================
+   教師登入
 ========================= */
 function isTeacherLoggedIn() {
   return sessionStorage.getItem("teacherLoggedIn") === "yes";
@@ -106,22 +178,22 @@ function showTeacherTab(tab) {
 }
 
 /* =========================
-   本機儲存
+   儲存
 ========================= */
 function getUnlocked() {
-  return JSON.parse(localStorage.getItem("zhGameUnlocked") || "1");
+  return JSON.parse(localStorage.getItem(getUnlockedKey()) || "1");
 }
 
 function setUnlocked(n) {
-  localStorage.setItem("zhGameUnlocked", JSON.stringify(n));
+  localStorage.setItem(getUnlockedKey(), JSON.stringify(n));
 }
 
 function getHistory() {
-  return JSON.parse(localStorage.getItem("zhGameHistory") || "[]");
+  return JSON.parse(localStorage.getItem(getHistoryKey()) || "[]");
 }
 
 function setHistory(arr) {
-  localStorage.setItem("zhGameHistory", JSON.stringify(arr));
+  localStorage.setItem(getHistoryKey(), JSON.stringify(arr));
 }
 
 function addHistory(record) {
@@ -131,23 +203,23 @@ function addHistory(record) {
 }
 
 function clearHistory() {
-  if (confirm("確定要清除所有歷史成績紀錄？")) {
-    localStorage.removeItem("zhGameHistory");
+  if (confirm(`確定要清除題庫「${getCurrentBankName()}」的所有歷史成績紀錄？`)) {
+    localStorage.removeItem(getHistoryKey());
     renderHistory();
     if (isTeacherLoggedIn()) {
       renderTeacherSummary();
       populateTeacherStudentSelect();
       renderTeacherDetail();
     }
-    alert("已清除歷史紀錄。");
+    alert("已清除當前題庫歷史紀錄。");
   }
 }
 
 function resetProgress() {
-  if (confirm("確定要重設所有解鎖進度？")) {
+  if (confirm(`確定要重設題庫「${getCurrentBankName()}」的解鎖進度？`)) {
     setUnlocked(1);
     initLevels();
-    alert("已重設為 Lv 1。");
+    alert("已重設當前題庫進度為 Lv 1。");
   }
 }
 
@@ -155,6 +227,7 @@ function resetProgress() {
    初始化
 ========================= */
 document.addEventListener("DOMContentLoaded", () => {
+  initBankSelect();
   initLevels();
   renderHistory();
   updateTeacherStatus();
@@ -182,7 +255,7 @@ function initLevels() {
 }
 
 /* =========================
-   歷史紀錄（首頁）
+   首頁歷史紀錄
 ========================= */
 function renderHistory() {
   const area = document.getElementById("historyArea");
@@ -296,7 +369,6 @@ function renderTeacherDetail() {
   let wrongHtml = "";
   if (h.responses && h.responses.length) {
     const wrongs = h.responses.filter(r => !r.correct);
-
     if (!wrongs.length) {
       wrongHtml = `<div class="teacher-box"><strong>錯題：</strong>本次全部答對或沒有錯題紀錄。</div>`;
     } else {
@@ -317,6 +389,7 @@ function renderTeacherDetail() {
 
   area.innerHTML = `
     <div class="teacher-meta">
+      <strong>題庫：</strong>${escapeHtml(getCurrentBankName())}<br>
       <strong>角色名：</strong>${escapeHtml(h.player || "")}<br>
       <strong>等級：</strong>Lv ${h.level}<br>
       <strong>得分：</strong>${h.score}/${h.total}<br>
@@ -347,6 +420,7 @@ function printTeacherSummary() {
     </head>
     <body>
       <h1>教師成績總覽</h1>
+      <div>題庫：${escapeHtml(getCurrentBankName())}</div>
       <table>
         <thead>
           <tr>
@@ -381,6 +455,7 @@ function printTeacherDetail() {
     </head>
     <body>
       <h1>教師查看學生錯題</h1>
+      <div>題庫：${escapeHtml(getCurrentBankName())}</div>
       <div class="box">${detail}</div>
       <button onclick="window.print()">列印 / 另存為 PDF</button>
     </body>
@@ -396,17 +471,11 @@ function printTeacherDetail() {
    難度設定
 ========================= */
 function getDifficultyProfile(level) {
-  if (level <= 20) {
-    return { preferred: [1, 2], fallback: [3], label: "基礎（1-2）" };
-  } else if (level <= 40) {
-    return { preferred: [2, 3], fallback: [1, 4], label: "基礎至中階（2-3）" };
-  } else if (level <= 60) {
-    return { preferred: [3, 4], fallback: [2, 5], label: "中階（3-4）" };
-  } else if (level <= 80) {
-    return { preferred: [4, 5], fallback: [3], label: "中高階（4-5）" };
-  } else {
-    return { preferred: [4, 5], fallback: [3], label: "高階（4-5）" };
-  }
+  if (level <= 20) return { preferred: [1, 2], fallback: [3], label: "基礎（1-2）" };
+  if (level <= 40) return { preferred: [2, 3], fallback: [1, 4], label: "基礎至中階（2-3）" };
+  if (level <= 60) return { preferred: [3, 4], fallback: [2, 5], label: "中階（3-4）" };
+  if (level <= 80) return { preferred: [4, 5], fallback: [3], label: "中高階（4-5）" };
+  return { preferred: [4, 5], fallback: [3], label: "高階（4-5）" };
 }
 
 /* =========================
@@ -458,6 +527,7 @@ function takeQuestions(pool, count, usedKeys) {
    題目生成
 ========================= */
 function buildQuestionSet(level) {
+  const QUESTION_BANK = getCurrentQuestionBank();
   const profile = getDifficultyProfile(level);
   const usedKeys = new Set();
   let result = [];
@@ -478,13 +548,9 @@ function buildQuestionSet(level) {
     const preferredPool = filterByDifficulty(allCat, profile.preferred, profile.fallback);
 
     let selected = takeQuestions(preferredPool, item.min, usedKeys);
-
     if (selected.length < item.min) {
-      selected = selected.concat(
-        takeQuestions(allCat, item.min - selected.length, usedKeys)
-      );
+      selected = selected.concat(takeQuestions(allCat, item.min - selected.length, usedKeys));
     }
-
     result = result.concat(selected);
   });
 
@@ -575,18 +641,13 @@ function updateTimerDisplay() {
 
   el.textContent = formatTime(timeLeft);
 
-  if (timeLeft <= 300) {
-    el.style.color = "#ef4444";
-  } else if (timeLeft <= 900) {
-    el.style.color = "#f59e0b";
-  } else {
-    el.style.color = "";
-  }
+  if (timeLeft <= 300) el.style.color = "#ef4444";
+  else if (timeLeft <= 900) el.style.color = "#f59e0b";
+  else el.style.color = "";
 }
 
 function getUsedTimeText() {
-  const used = QUIZ_TIME_SECONDS - timeLeft;
-  return formatTime(used);
+  return formatTime(QUIZ_TIME_SECONDS - timeLeft);
 }
 
 /* =========================
@@ -604,7 +665,6 @@ function startGame() {
     alert("請先輸入角色名。");
     return;
   }
-
   if (level > unlocked) {
     alert("此等級尚未解鎖。");
     return;
@@ -620,14 +680,15 @@ function startGame() {
 
   const profile = getDifficultyProfile(level);
 
-  document.getElementById("gameTitle").textContent = `${player} 的闖關試煉：Lv ${currentLevel}`;
+  document.getElementById("gameTitle").textContent = `${player} 的中文闖關遊戲：Lv ${currentLevel}`;
   document.getElementById("gameSub").innerHTML =
     `本關包含 <span class="pill">${currentSet.length} 題</span>　` +
     `<span class="pill">難度：${profile.label}</span>　` +
-    `<span class="pill">覆蓋所有範圍</span>`;
+    `<span class="pill">題庫：${escapeHtml(getCurrentBankName())}</span>`;
 
   document.getElementById("statLevel").textContent = currentLevel;
   document.getElementById("statCount").textContent = currentSet.length;
+  updateCurrentBankLabel();
 
   renderQuiz();
   updateProgress();
@@ -650,6 +711,7 @@ function backHome() {
   document.getElementById("startPanel").classList.remove("hidden");
   initLevels();
   renderHistory();
+  updateCurrentBankLabel();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -663,7 +725,6 @@ function renderQuiz() {
   currentSet.forEach((q, idx) => {
     const div = document.createElement("div");
     div.className = "question";
-
     div.innerHTML = `
       <div class="q-meta">第 ${idx + 1} 題 ・ ${q.cat} ・ ${q.type} ・ 難度 ${q.diff}</div>
       <div class="q-title">${q.q}</div>
@@ -682,21 +743,17 @@ function renderQuiz() {
 }
 
 /* =========================
-   進度條
+   進度
 ========================= */
 function updateProgress() {
   const total = currentSet.length;
   let done = 0;
-
   for (let i = 0; i < total; i++) {
     const checked = document.querySelector(`input[name="q${i}"]:checked`);
     if (checked) done++;
   }
-
   const progress = document.getElementById("progressBar");
-  if (progress) {
-    progress.style.width = `${(done / total) * 100}%`;
-  }
+  if (progress) progress.style.width = `${(done / total) * 100}%`;
 }
 
 /* =========================
@@ -770,6 +827,7 @@ function submitLevel(autoSubmit = false) {
   }
 
   addHistory({
+    bank: getCurrentBankName(),
     player,
     level: currentLevel,
     score,
@@ -784,6 +842,7 @@ function submitLevel(autoSubmit = false) {
   rp.classList.remove("hidden");
   rp.innerHTML = `
     <h3>本關結果 ${autoSubmit ? "（時間到自動交卷）" : ""}</h3>
+    <div>題庫：<strong>${escapeHtml(getCurrentBankName())}</strong></div>
     <div>角色名：<strong>${escapeHtml(player)}</strong></div>
     <div>等級：<strong>Lv ${currentLevel}</strong></div>
     <div>得分：<strong>${score} / ${currentSet.length}</strong></div>
@@ -805,12 +864,10 @@ function submitLevel(autoSubmit = false) {
 
   initLevels();
   renderHistory();
-
   if (isTeacherLoggedIn()) {
     renderTeacherSummary();
     populateTeacherStudentSelect();
   }
-
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -828,7 +885,7 @@ function goNextLevel() {
 }
 
 /* =========================
-   PDF / 列印
+   PDF
 ========================= */
 function openPrintWindow(html) {
   const w = window.open("", "_blank");
@@ -867,8 +924,9 @@ function downloadBlankPDFLike() {
         ${basePrintCSS()}
       </head>
       <body>
-        <h1>中三中文闖關王 — 學生作答紙</h1>
+        <h1>中文闖關遊戲 — 學生作答紙</h1>
         <div class="meta">
+          題庫：${escapeHtml(getCurrentBankName())}<br>
           角色名：${escapeHtml(name)}<br>
           等級：Lv ${level}<br>
           題數：${set.length}<br>
@@ -900,8 +958,9 @@ function downloadAnswerSheetWithResponses() {
         ${basePrintCSS()}
       </head>
       <body>
-        <h1>中三中文闖關王 — 本關作答與答案</h1>
+        <h1>中文闖關遊戲 — 本關作答與答案</h1>
         <div class="meta">
+          題庫：${escapeHtml(getCurrentBankName())}<br>
           角色名：${escapeHtml(player)}<br>
           等級：Lv ${currentLevel}<br>
           題數：${currentSet.length}<br>
@@ -930,7 +989,7 @@ function downloadAnswerSheetWithResponses() {
 }
 
 /* =========================
-   HTML安全處理
+   HTML 安全
 ========================= */
 function escapeHtml(str) {
   return String(str)
