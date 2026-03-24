@@ -2,6 +2,7 @@ const TOTAL_LEVELS = 100;
 const QUESTIONS_PER_LEVEL = 30;
 const QUIZ_TIME_SECONDS = 60 * 60;
 const TEACHER_PASSWORD = "teacher2026";
+const MIN_QUESTION_BANK_SIZE = 50;
 
 let currentLevel = 1;
 let player = "";
@@ -29,21 +30,54 @@ function getCurrentQuestionBank() {
   return QUESTION_BANKS[getCurrentBankName()] || [];
 }
 
+function validateBankByName(bankName) {
+  const bank = QUESTION_BANKS[bankName] || [];
+  if (!Array.isArray(bank) || bank.length < MIN_QUESTION_BANK_SIZE) {
+    return {
+      ok: false,
+      message: `題庫「${bankName}」只有 ${bank.length} 題，少於 ${MIN_QUESTION_BANK_SIZE} 題，暫不可用。`
+    };
+  }
+  return {
+    ok: true,
+    message: `題庫「${bankName}」可正常使用，共 ${bank.length} 題。`
+  };
+}
+
+function validateCurrentBank() {
+  return validateBankByName(getCurrentBankName());
+}
+
 function initBankSelect() {
   const sel = document.getElementById("bankSelect");
   if (!sel) return;
 
   const banks = getAvailableBanks();
-  const current = getCurrentBankName();
+  let current = getCurrentBankName();
   sel.innerHTML = "";
 
+  const usableBanks = [];
+
   banks.forEach(name => {
+    const check = validateBankByName(name);
+    if (check.ok) usableBanks.push(name);
+
     const op = document.createElement("option");
     op.value = name;
-    op.textContent = name;
-    if (name === current) op.selected = true;
+    op.textContent = check.ok ? `${name}（可用）` : `${name}（題目不足）`;
+    if (!check.ok) op.disabled = true;
+    if (name === current && check.ok) op.selected = true;
     sel.appendChild(op);
   });
+
+  // 如果當前題庫不可用，自動切去第一個可用題庫
+  if (!usableBanks.includes(current)) {
+    if (usableBanks.length > 0) {
+      current = usableBanks[0];
+      setCurrentBankName(current);
+      sel.value = current;
+    }
+  }
 
   updateCurrentBankLabel();
 }
@@ -74,80 +108,8 @@ function updateCurrentBankLabel() {
   if (stat) stat.textContent = name;
 }
 
-/* =========================
-   題庫完整性檢查
-========================= */
-function validateCurrentBank() {
-  const bankName = getCurrentBankName();
-  const bank = getCurrentQuestionBank();
-
-  if (!Array.isArray(bank) || bank.length === 0) {
-    return {
-      ok: false,
-      message: `題庫「${bankName}」沒有任何題目。`
-    };
-  }
-
-  if (bank.length < QUESTIONS_PER_LEVEL) {
-    return {
-      ok: false,
-      message: `題庫「${bankName}」目前只有 ${bank.length} 題，不足 ${QUESTIONS_PER_LEVEL} 題，暫時不能開啟闖關。`
-    };
-  }
-
-  const requiredCats = ["水調歌頭", "孔明借箭", "最苦與最樂", "人間有情", "語文運用"];
-  const requiredTypes = ["體裁", "文言字詞", "閱讀理解"];
-  const requiredLangTypes = ["單元五", "單元六", "單元七"];
-
-  for (const cat of requiredCats) {
-    const hasCat = bank.some(q => q.cat === cat);
-    if (!hasCat) {
-      return {
-        ok: false,
-        message: `題庫「${bankName}」缺少分類：${cat}`
-      };
-    }
-  }
-
-  for (const cat of ["水調歌頭", "孔明借箭", "最苦與最樂", "人間有情"]) {
-    for (const type of requiredTypes) {
-      const hasType = bank.some(q => q.cat === cat && q.type === type);
-      if (!hasType) {
-        return {
-          ok: false,
-          message: `題庫「${bankName}」在「${cat}」中缺少題型：${type}`
-        };
-      }
-    }
-  }
-
-  for (const type of requiredLangTypes) {
-    const hasType = bank.some(q => q.cat === "語文運用" && q.type === type);
-    if (!hasType) {
-      return {
-        ok: false,
-        message: `題庫「${bankName}」缺少語文運用分類：${type}`
-      };
-    }
-  }
-
-  return {
-    ok: true,
-    message: `題庫「${bankName}」可正常使用，共 ${bank.length} 題。`
-  };
-}
-
 function renderBankStatus() {
-  let box = document.getElementById("bankStatus");
-  const startPanel = document.getElementById("startPanel");
-
-  if (!box && startPanel) {
-    box = document.createElement("div");
-    box.id = "bankStatus";
-    box.className = "teacher-status";
-    startPanel.appendChild(box);
-  }
-
+  const box = document.getElementById("bankStatus");
   if (!box) return;
 
   const result = validateCurrentBank();
@@ -625,44 +587,16 @@ function buildQuestionSet(level) {
     { cat: "語文運用", min: 9 }
   ];
 
-  const requiredTypes = ["體裁", "文言字詞", "閱讀理解"];
-  const languageTypes = ["單元五", "單元六", "單元七"];
-
   categoryPlan.forEach(item => {
     const allCat = QUESTION_BANK.filter(q => q.cat === item.cat);
     const preferredPool = filterByDifficulty(allCat, profile.preferred, profile.fallback);
-
     let selected = takeQuestions(preferredPool, item.min, usedKeys);
+
     if (selected.length < item.min) {
       selected = selected.concat(takeQuestions(allCat, item.min - selected.length, usedKeys));
     }
+
     result = result.concat(selected);
-  });
-
-  ["水調歌頭", "孔明借箭", "最苦與最樂", "人間有情"].forEach(cat => {
-    requiredTypes.forEach(type => {
-      const exists = result.some(q => q.cat === cat && q.type === type);
-      if (!exists) {
-        const candidates = QUESTION_BANK.filter(q =>
-          q.cat === cat &&
-          q.type === type &&
-          (profile.preferred.includes(q.diff) || profile.fallback.includes(q.diff))
-        );
-        result = result.concat(takeQuestions(candidates, 1, usedKeys));
-      }
-    });
-  });
-
-  languageTypes.forEach(type => {
-    const exists = result.some(q => q.cat === "語文運用" && q.type === type);
-    if (!exists) {
-      const candidates = QUESTION_BANK.filter(q =>
-        q.cat === "語文運用" &&
-        q.type === type &&
-        (profile.preferred.includes(q.diff) || profile.fallback.includes(q.diff))
-      );
-      result = result.concat(takeQuestions(candidates, 1, usedKeys));
-    }
   });
 
   if (result.length > QUESTIONS_PER_LEVEL) {
