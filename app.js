@@ -1,8 +1,8 @@
 const TOTAL_LEVELS = 100;
 const QUESTIONS_PER_LEVEL = 30;
-const QUIZ_TIME_SECONDS = 60 * 60;
+const QUIZ_TIME_SECONDS = 60 * 60; // 60分鐘
 const TEACHER_PASSWORD = "teacher2026";
-const MIN_QUESTION_BANK_SIZE = 50;
+const MIN_QUESTION_BANK_SIZE = 50; // 題庫最少需要 50 題才開放
 
 let currentLevel = 1;
 let player = "";
@@ -30,6 +30,7 @@ function getCurrentQuestionBank() {
   return QUESTION_BANKS[getCurrentBankName()] || [];
 }
 
+// 題庫檢查：只檢查總題數是否大於等於 MIN_QUESTION_BANK_SIZE
 function validateBankByName(bankName) {
   const bank = QUESTION_BANKS[bankName] || [];
   if (!Array.isArray(bank) || bank.length < MIN_QUESTION_BANK_SIZE) {
@@ -65,18 +66,21 @@ function initBankSelect() {
     const op = document.createElement("option");
     op.value = name;
     op.textContent = check.ok ? `${name}（可用）` : `${name}（題目不足）`;
+    
+    // 若題目不足則禁用該選項
     if (!check.ok) op.disabled = true;
+    
+    // 若是當前題庫且可用，設為預設選中
     if (name === current && check.ok) op.selected = true;
+    
     sel.appendChild(op);
   });
 
-  // 如果當前題庫不可用，自動切去第一個可用題庫
-  if (!usableBanks.includes(current)) {
-    if (usableBanks.length > 0) {
-      current = usableBanks[0];
-      setCurrentBankName(current);
-      sel.value = current;
-    }
+  // 如果當前儲存的題庫變成不可用，自動切換到第一個可用的題庫
+  if (!usableBanks.includes(current) && usableBanks.length > 0) {
+    current = usableBanks[0];
+    setCurrentBankName(current);
+    sel.value = current;
   }
 
   updateCurrentBankLabel();
@@ -119,7 +123,7 @@ function renderBankStatus() {
 }
 
 /* =========================
-   Storage Keys
+   Storage Keys (按題庫分開存)
 ========================= */
 function getUnlockedKey() {
   return `zhGameUnlocked_${getCurrentBankName()}`;
@@ -223,7 +227,7 @@ function showTeacherTab(tab) {
 }
 
 /* =========================
-   儲存
+   學生資料儲存
 ========================= */
 function getUnlocked() {
   return JSON.parse(localStorage.getItem(getUnlockedKey()) || "1");
@@ -244,7 +248,7 @@ function setHistory(arr) {
 function addHistory(record) {
   const history = getHistory();
   history.unshift(record);
-  setHistory(history.slice(0, 200));
+  setHistory(history.slice(0, 200)); // 保留最近 200 筆
 }
 
 function clearHistory() {
@@ -280,7 +284,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* =========================
-   初始化等級
+   初始化等級選單
 ========================= */
 function initLevels() {
   const sel = document.getElementById("levelSelect");
@@ -301,7 +305,7 @@ function initLevels() {
 }
 
 /* =========================
-   歷史紀錄
+   首頁歷史紀錄顯示
 ========================= */
 function renderHistory() {
   const area = document.getElementById("historyArea");
@@ -327,7 +331,7 @@ function renderHistory() {
 }
 
 /* =========================
-   教師總覽
+   教師後台：成績總覽
 ========================= */
 function renderTeacherSummary() {
   if (!isTeacherLoggedIn()) return;
@@ -366,6 +370,9 @@ function renderTeacherSummary() {
   `).join("");
 }
 
+/* =========================
+   教師後台：錯題詳情
+========================= */
 function populateTeacherStudentSelect() {
   if (!isTeacherLoggedIn()) return;
 
@@ -515,7 +522,7 @@ function printTeacherDetail() {
 }
 
 /* =========================
-   難度設定
+   難度與抽題
 ========================= */
 function getDifficultyProfile(level) {
   if (level <= 20) return { preferred: [1, 2], fallback: [3], label: "基礎（1-2）" };
@@ -525,9 +532,6 @@ function getDifficultyProfile(level) {
   return { preferred: [4, 5], fallback: [3], label: "高階（4-5）" };
 }
 
-/* =========================
-   工具函數
-========================= */
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -551,12 +555,6 @@ function uniqueQuestions(arr) {
   });
 }
 
-function filterByDifficulty(pool, preferred, fallback = []) {
-  const p = pool.filter(q => preferred.includes(q.diff));
-  if (p.length > 0) return p;
-  return pool.filter(q => fallback.includes(q.diff));
-}
-
 function takeQuestions(pool, count, usedKeys) {
   const result = [];
   for (const q of shuffle(uniqueQuestions(pool))) {
@@ -570,52 +568,26 @@ function takeQuestions(pool, count, usedKeys) {
   return result;
 }
 
-/* =========================
-   題目生成
-========================= */
+// 抽題邏輯精簡版：優先按難度抽，不夠就從整個題庫補足
 function buildQuestionSet(level) {
   const QUESTION_BANK = getCurrentQuestionBank();
   const profile = getDifficultyProfile(level);
   const usedKeys = new Set();
   let result = [];
 
-  const categoryPlan = [
-    { cat: "水調歌頭", min: 5 },
-    { cat: "孔明借箭", min: 6 },
-    { cat: "最苦與最樂", min: 5 },
-    { cat: "人間有情", min: 5 },
-    { cat: "語文運用", min: 9 }
-  ];
+  // 1. 先從偏好難度抽
+  const preferredPool = QUESTION_BANK.filter(q => profile.preferred.includes(q.diff));
+  result = result.concat(takeQuestions(preferredPool, QUESTIONS_PER_LEVEL, usedKeys));
 
-  categoryPlan.forEach(item => {
-    const allCat = QUESTION_BANK.filter(q => q.cat === item.cat);
-    const preferredPool = filterByDifficulty(allCat, profile.preferred, profile.fallback);
-    let selected = takeQuestions(preferredPool, item.min, usedKeys);
-
-    if (selected.length < item.min) {
-      selected = selected.concat(takeQuestions(allCat, item.min - selected.length, usedKeys));
-    }
-
-    result = result.concat(selected);
-  });
-
-  if (result.length > QUESTIONS_PER_LEVEL) {
-    result = shuffle(result).slice(0, QUESTIONS_PER_LEVEL);
+  // 2. 如果不夠 30 題，從備用難度抽
+  if (result.length < QUESTIONS_PER_LEVEL) {
+    const fallbackPool = QUESTION_BANK.filter(q => profile.fallback.includes(q.diff));
+    result = result.concat(takeQuestions(fallbackPool, QUESTIONS_PER_LEVEL - result.length, usedKeys));
   }
 
+  // 3. 還是不夠，就從整個題庫隨機抽
   if (result.length < QUESTIONS_PER_LEVEL) {
-    const supplementPool = QUESTION_BANK.filter(q =>
-      profile.preferred.includes(q.diff) || profile.fallback.includes(q.diff)
-    );
-    result = result.concat(
-      takeQuestions(supplementPool, QUESTIONS_PER_LEVEL - result.length, usedKeys)
-    );
-  }
-
-  if (result.length < QUESTIONS_PER_LEVEL) {
-    result = result.concat(
-      takeQuestions(QUESTION_BANK, QUESTIONS_PER_LEVEL - result.length, usedKeys)
-    );
+    result = result.concat(takeQuestions(QUESTION_BANK, QUESTIONS_PER_LEVEL - result.length, usedKeys));
   }
 
   return shuffle(result).slice(0, QUESTIONS_PER_LEVEL);
@@ -669,7 +641,7 @@ function getUsedTimeText() {
 }
 
 /* =========================
-   開始遊戲
+   遊戲流程控制
 ========================= */
 function startGame() {
   const validation = validateCurrentBank();
@@ -701,7 +673,7 @@ function startGame() {
   answered = false;
 
   if (!currentSet.length || currentSet.length < QUESTIONS_PER_LEVEL) {
-    alert("題庫題目不足，無法正常開始本關。請更換題庫或補充題目。");
+    alert("題庫題目異常，無法正常開始。請更換題庫。");
     return;
   }
 
@@ -731,9 +703,6 @@ function startGame() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-/* =========================
-   返回主頁
-========================= */
 function backHome() {
   stopTimer();
   document.getElementById("gamePanel").classList.add("hidden");
@@ -745,9 +714,6 @@ function backHome() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-/* =========================
-   顯示題目
-========================= */
 function renderQuiz() {
   const area = document.getElementById("quizArea");
   area.innerHTML = "";
@@ -772,9 +738,6 @@ function renderQuiz() {
   });
 }
 
-/* =========================
-   進度
-========================= */
 function updateProgress() {
   const total = currentSet.length;
   let done = 0;
@@ -786,9 +749,6 @@ function updateProgress() {
   if (progress) progress.style.width = `${(done / total) * 100}%`;
 }
 
-/* =========================
-   提交答案
-========================= */
 function submitLevel(autoSubmit = false) {
   if (answered) return;
   answered = true;
@@ -901,9 +861,6 @@ function submitLevel(autoSubmit = false) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-/* =========================
-   下一關
-========================= */
 function goNextLevel() {
   const unlocked = getUnlocked();
   if (currentLevel + 1 <= unlocked) {
@@ -1034,4 +991,3 @@ function escapeHtml(str) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 }
-
