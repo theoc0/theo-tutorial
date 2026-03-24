@@ -1,6 +1,7 @@
 const TOTAL_LEVELS = 100;
 const QUESTIONS_PER_LEVEL = 30;
 const QUIZ_TIME_SECONDS = 60 * 60; // 60分鐘
+const TEACHER_PASSWORD = "teacher2026";
 
 let currentLevel = 1;
 let player = "";
@@ -9,6 +10,100 @@ let answered = false;
 
 let timer = null;
 let timeLeft = QUIZ_TIME_SECONDS;
+
+/* =========================
+   教師登入狀態
+========================= */
+function isTeacherLoggedIn() {
+  return sessionStorage.getItem("teacherLoggedIn") === "yes";
+}
+
+function setTeacherLoggedIn(flag) {
+  if (flag) {
+    sessionStorage.setItem("teacherLoggedIn", "yes");
+  } else {
+    sessionStorage.removeItem("teacherLoggedIn");
+  }
+  updateTeacherStatus();
+}
+
+function updateTeacherStatus() {
+  const status = document.getElementById("teacherStatus");
+  if (!status) return;
+  status.textContent = `教師後台狀態：${isTeacherLoggedIn() ? "已登入" : "未登入"}`;
+}
+
+function handleTeacherPanelAccess() {
+  if (isTeacherLoggedIn()) {
+    toggleTeacherPanel(true);
+    return;
+  }
+
+  const pw = prompt("請輸入教師後台密碼：");
+  if (pw === null) return;
+
+  if (pw === TEACHER_PASSWORD) {
+    setTeacherLoggedIn(true);
+    alert("教師登入成功。");
+    toggleTeacherPanel(true);
+  } else {
+    alert("密碼錯誤。");
+  }
+}
+
+function teacherLogout() {
+  if (!isTeacherLoggedIn()) {
+    alert("目前未登入教師後台。");
+    return;
+  }
+  setTeacherLoggedIn(false);
+  const panel = document.getElementById("teacherPanel");
+  if (panel) panel.classList.add("hidden-admin");
+  alert("已登出教師後台。");
+}
+
+function toggleTeacherPanel(forceOpen = false) {
+  const panel = document.getElementById("teacherPanel");
+  if (!panel) return;
+
+  if (!isTeacherLoggedIn()) {
+    alert("請先登入教師後台。");
+    return;
+  }
+
+  if (forceOpen) {
+    panel.classList.remove("hidden-admin");
+    renderTeacherSummary();
+    populateTeacherStudentSelect();
+    return;
+  }
+
+  if (panel.classList.contains("hidden-admin")) {
+    panel.classList.remove("hidden-admin");
+    renderTeacherSummary();
+    populateTeacherStudentSelect();
+  } else {
+    panel.classList.add("hidden-admin");
+  }
+}
+
+function showTeacherTab(tab) {
+  if (!isTeacherLoggedIn()) {
+    alert("請先登入教師後台。");
+    return;
+  }
+
+  document.getElementById("teacherSummaryTab").classList.toggle("hidden", tab !== "summary");
+  document.getElementById("teacherDetailTab").classList.toggle("hidden", tab !== "detail");
+  document.getElementById("tabSummaryBtn").classList.toggle("active", tab === "summary");
+  document.getElementById("tabDetailBtn").classList.toggle("active", tab === "detail");
+
+  if (tab === "summary") renderTeacherSummary();
+  if (tab === "detail") {
+    populateTeacherStudentSelect();
+    renderTeacherDetail();
+  }
+}
 
 /* =========================
    本機儲存
@@ -32,14 +127,18 @@ function setHistory(arr) {
 function addHistory(record) {
   const history = getHistory();
   history.unshift(record);
-  // 只保留最近100筆
-  setHistory(history.slice(0, 100));
+  setHistory(history.slice(0, 200));
 }
 
 function clearHistory() {
   if (confirm("確定要清除所有歷史成績紀錄？")) {
     localStorage.removeItem("zhGameHistory");
     renderHistory();
+    if (isTeacherLoggedIn()) {
+      renderTeacherSummary();
+      populateTeacherStudentSelect();
+      renderTeacherDetail();
+    }
     alert("已清除歷史紀錄。");
   }
 }
@@ -53,46 +152,21 @@ function resetProgress() {
 }
 
 /* =========================
-   初始化介面
+   初始化
 ========================= */
 document.addEventListener("DOMContentLoaded", () => {
   initLevels();
-  ensureExtraPanels();
   renderHistory();
+  updateTeacherStatus();
 });
 
-function ensureExtraPanels() {
-  const startPanel = document.getElementById("startPanel");
-  if (startPanel && !document.getElementById("historyPanel")) {
-    const div = document.createElement("div");
-    div.id = "historyPanel";
-    div.className = "panel";
-    div.innerHTML = `
-      <h2>歷史成績紀錄</h2>
-      <div id="historyArea" class="small">尚未有紀錄。</div>
-      <div style="margin-top:12px">
-        <button class="secondary" onclick="clearHistory()">清除歷史紀錄</button>
-      </div>
-    `;
-    startPanel.parentNode.appendChild(div);
-  }
-
-  const gamePanel = document.getElementById("gamePanel");
-  if (gamePanel && !document.getElementById("timerBox")) {
-    const topbar = gamePanel.querySelector(".topbar");
-    if (topbar) {
-      const timerStat = document.createElement("div");
-      timerStat.className = "stat";
-      timerStat.id = "timerBox";
-      timerStat.innerHTML = `<div class="k">剩餘時間</div><div class="v" id="timerDisplay">60:00</div>`;
-      topbar.querySelector(".row")?.appendChild(timerStat);
-    }
-  }
-}
-
+/* =========================
+   初始化等級
+========================= */
 function initLevels() {
   const sel = document.getElementById("levelSelect");
   if (!sel) return;
+
   const unlocked = getUnlocked();
   sel.innerHTML = "";
 
@@ -103,11 +177,12 @@ function initLevels() {
     if (i > unlocked) op.disabled = true;
     sel.appendChild(op);
   }
+
   sel.value = 1;
 }
 
 /* =========================
-   歷史紀錄顯示
+   歷史紀錄（首頁）
 ========================= */
 function renderHistory() {
   const area = document.getElementById("historyArea");
@@ -119,19 +194,202 @@ function renderHistory() {
     return;
   }
 
-  area.innerHTML = history.slice(0, 15).map((h, i) => {
-    return `
-      <div style="padding:10px 0;border-bottom:1px solid #334155">
-        <strong>${i + 1}. ${escapeHtml(h.player)}</strong>
-        ｜Lv ${h.level}
-        ｜${h.score}/${h.total}
-        ｜${h.passed ? '<span class="correct">過關</span>' : '<span class="wrong">未過關</span>'}
-        ｜${escapeHtml(h.timeUsed)}
-        <br>
-        <span class="small">${escapeHtml(h.date)}</span>
-      </div>
-    `;
-  }).join("");
+  area.innerHTML = history.slice(0, 15).map((h, i) => `
+    <div style="padding:10px 0;border-bottom:1px solid #334155">
+      <strong>${i + 1}. ${escapeHtml(h.player)}</strong>
+      ｜Lv ${h.level}
+      ｜${h.score}/${h.total}
+      ｜${h.passed ? '<span class="correct">過關</span>' : '<span class="wrong">未過關</span>'}
+      ｜${escapeHtml(h.timeUsed || "")}
+      <br>
+      <span class="small">${escapeHtml(h.date || "")}</span>
+    </div>
+  `).join("");
+}
+
+/* =========================
+   教師總覽
+========================= */
+function renderTeacherSummary() {
+  if (!isTeacherLoggedIn()) return;
+
+  const body = document.getElementById("teacherSummaryBody");
+  if (!body) return;
+
+  const search = (document.getElementById("teacherSearchName")?.value || "").trim().toLowerCase();
+  const filter = document.getElementById("teacherFilterPass")?.value || "all";
+  const history = getHistory();
+
+  let rows = history.filter(h => {
+    const matchName = !search || (h.player || "").toLowerCase().includes(search);
+    const matchPass =
+      filter === "all" ||
+      (filter === "pass" && h.passed) ||
+      (filter === "fail" && !h.passed);
+    return matchName && matchPass;
+  });
+
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="7">沒有符合條件的紀錄。</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = rows.map((h, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${escapeHtml(h.player || "")}</td>
+      <td>Lv ${h.level}</td>
+      <td>${h.score}/${h.total}</td>
+      <td>${h.passed ? '<span class="pill-pass">過關</span>' : '<span class="pill-fail">未過關</span>'}</td>
+      <td>${escapeHtml(h.timeUsed || "")}</td>
+      <td>${escapeHtml(h.date || "")}</td>
+    </tr>
+  `).join("");
+}
+
+function populateTeacherStudentSelect() {
+  if (!isTeacherLoggedIn()) return;
+
+  const sel = document.getElementById("teacherStudentSelect");
+  if (!sel) return;
+
+  const history = getHistory();
+  sel.innerHTML = "";
+
+  if (!history.length) {
+    const op = document.createElement("option");
+    op.value = "";
+    op.textContent = "尚未有學生紀錄";
+    sel.appendChild(op);
+    return;
+  }
+
+  history.forEach((h, i) => {
+    const op = document.createElement("option");
+    op.value = i;
+    op.textContent = `${h.player}｜Lv ${h.level}｜${h.score}/${h.total}｜${h.date}`;
+    sel.appendChild(op);
+  });
+}
+
+function renderTeacherDetail() {
+  if (!isTeacherLoggedIn()) return;
+
+  const area = document.getElementById("teacherDetailArea");
+  const sel = document.getElementById("teacherStudentSelect");
+  if (!area || !sel) return;
+
+  const history = getHistory();
+
+  if (!history.length || sel.value === "") {
+    area.innerHTML = "請先選擇一條學生紀錄。";
+    return;
+  }
+
+  const idx = parseInt(sel.value, 10);
+  const h = history[idx];
+  if (!h) {
+    area.innerHTML = "找不到相關紀錄。";
+    return;
+  }
+
+  let wrongHtml = "";
+  if (h.responses && h.responses.length) {
+    const wrongs = h.responses.filter(r => !r.correct);
+
+    if (!wrongs.length) {
+      wrongHtml = `<div class="teacher-box"><strong>錯題：</strong>本次全部答對或沒有錯題紀錄。</div>`;
+    } else {
+      wrongHtml = wrongs.map((r, i) => `
+        <div class="wrong-q">
+          <strong>錯題 ${i + 1}</strong><br>
+          <strong>課文 / 類型：</strong>${escapeHtml(r.cat || "")} / ${escapeHtml(r.type || "")}<br>
+          <strong>題目：</strong>${escapeHtml(r.question || "")}<br>
+          <strong>學生答案：</strong>${escapeHtml(r.studentAnswer || "未作答")}<br>
+          <strong>正確答案：</strong>${escapeHtml(r.correctAnswer || "")}<br>
+          <strong>解說：</strong>${escapeHtml(r.explanation || "")}
+        </div>
+      `).join("");
+    }
+  } else {
+    wrongHtml = `<div class="teacher-box"><strong>提示：</strong>這筆紀錄沒有逐題作答資料。</div>`;
+  }
+
+  area.innerHTML = `
+    <div class="teacher-meta">
+      <strong>角色名：</strong>${escapeHtml(h.player || "")}<br>
+      <strong>等級：</strong>Lv ${h.level}<br>
+      <strong>得分：</strong>${h.score}/${h.total}<br>
+      <strong>狀態：</strong>${h.passed ? '<span class="pill-pass">過關</span>' : '<span class="pill-fail">未過關</span>'}<br>
+      <strong>作答時間：</strong>${escapeHtml(h.timeUsed || "")}<br>
+      <strong>日期：</strong>${escapeHtml(h.date || "")}
+    </div>
+    <h3>錯題詳情</h3>
+    ${wrongHtml}
+  `;
+}
+
+function printTeacherSummary() {
+  if (!isTeacherLoggedIn()) return;
+
+  const body = document.getElementById("teacherSummaryBody")?.innerHTML || "";
+  const html = `
+    <html>
+    <head>
+      <title>教師成績總覽</title>
+      <style>
+        body{font-family:"Microsoft JhengHei",sans-serif;padding:24px;line-height:1.8}
+        table{width:100%;border-collapse:collapse}
+        th,td{border:1px solid #666;padding:8px;text-align:left}
+        th{background:#eee}
+        @media print { button{display:none} }
+      </style>
+    </head>
+    <body>
+      <h1>教師成績總覽</h1>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>角色名</th><th>等級</th><th>得分</th><th>狀態</th><th>作答時間</th><th>日期</th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+      </table>
+      <button onclick="window.print()">列印 / 另存為 PDF</button>
+    </body>
+    </html>
+  `;
+  const w = window.open("", "_blank");
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+}
+
+function printTeacherDetail() {
+  if (!isTeacherLoggedIn()) return;
+
+  const detail = document.getElementById("teacherDetailArea")?.innerHTML || "";
+  const html = `
+    <html>
+    <head>
+      <title>教師查看學生錯題</title>
+      <style>
+        body{font-family:"Microsoft JhengHei",sans-serif;padding:24px;line-height:1.8}
+        .box{border:1px solid #666;padding:12px;margin:12px 0;border-radius:8px}
+        @media print { button{display:none} }
+      </style>
+    </head>
+    <body>
+      <h1>教師查看學生錯題</h1>
+      <div class="box">${detail}</div>
+      <button onclick="window.print()">列印 / 另存為 PDF</button>
+    </body>
+    </html>
+  `;
+  const w = window.open("", "_blank");
+  w.document.write(html);
+  w.document.close();
+  w.focus();
 }
 
 /* =========================
@@ -218,11 +476,13 @@ function buildQuestionSet(level) {
   categoryPlan.forEach(item => {
     const allCat = QUESTION_BANK.filter(q => q.cat === item.cat);
     const preferredPool = filterByDifficulty(allCat, profile.preferred, profile.fallback);
+
     let selected = takeQuestions(preferredPool, item.min, usedKeys);
 
     if (selected.length < item.min) {
-      const remain = item.min - selected.length;
-      selected = selected.concat(takeQuestions(allCat, remain, usedKeys));
+      selected = selected.concat(
+        takeQuestions(allCat, item.min - selected.length, usedKeys)
+      );
     }
 
     result = result.concat(selected);
@@ -311,15 +571,16 @@ function stopTimer() {
 
 function updateTimerDisplay() {
   const el = document.getElementById("timerDisplay");
-  if (el) {
-    el.textContent = formatTime(timeLeft);
-    if (timeLeft <= 300) {
-      el.style.color = "#ef4444";
-    } else if (timeLeft <= 900) {
-      el.style.color = "#f59e0b";
-    } else {
-      el.style.color = "";
-    }
+  if (!el) return;
+
+  el.textContent = formatTime(timeLeft);
+
+  if (timeLeft <= 300) {
+    el.style.color = "#ef4444";
+  } else if (timeLeft <= 900) {
+    el.style.color = "#f59e0b";
+  } else {
+    el.style.color = "";
   }
 }
 
@@ -447,18 +708,24 @@ function submitLevel(autoSubmit = false) {
   stopTimer();
 
   let score = 0;
+  let responseLog = [];
 
   currentSet.forEach((q, idx) => {
     const selected = document.querySelector(`input[name="q${idx}"]:checked`);
     const fb = document.getElementById(`feedback-${idx}`);
 
-    // 禁用作答
     document.querySelectorAll(`input[name="q${idx}"]`).forEach(el => el.disabled = true);
+
+    let studentAnswerText = "未作答";
+    let correct = false;
 
     if (selected) {
       const val = parseInt(selected.value, 10);
+      studentAnswerText = `${String.fromCharCode(65 + val)}. ${q.opts[val]}`;
+
       if (val === q.ans) {
         score++;
+        correct = true;
         fb.innerHTML = `
           <span class="correct">✓ 你答對了</span><br>
           <strong>正確答案：</strong>${String.fromCharCode(65 + q.ans)}. ${q.opts[q.ans]}<br>
@@ -481,6 +748,16 @@ function submitLevel(autoSubmit = false) {
     }
 
     fb.classList.remove("hidden");
+
+    responseLog.push({
+      cat: q.cat,
+      type: q.type,
+      question: q.q,
+      studentAnswer: studentAnswerText,
+      correctAnswer: `${String.fromCharCode(65 + q.ans)}. ${q.opts[q.ans]}`,
+      explanation: q.exp,
+      correct: correct
+    });
   });
 
   const passLine = Math.ceil(currentSet.length * 0.6);
@@ -492,7 +769,6 @@ function submitLevel(autoSubmit = false) {
     setUnlocked(unlocked);
   }
 
-  // 寫入歷史
   addHistory({
     player,
     level: currentLevel,
@@ -500,7 +776,8 @@ function submitLevel(autoSubmit = false) {
     total: currentSet.length,
     passed,
     timeUsed: getUsedTimeText(),
-    date: new Date().toLocaleString("zh-Hant-HK")
+    date: new Date().toLocaleString("zh-Hant-HK"),
+    responses: responseLog
   });
 
   const rp = document.getElementById("resultPanel");
@@ -528,11 +805,17 @@ function submitLevel(autoSubmit = false) {
 
   initLevels();
   renderHistory();
+
+  if (isTeacherLoggedIn()) {
+    renderTeacherSummary();
+    populateTeacherStudentSelect();
+  }
+
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 /* =========================
-   前往下一關
+   下一關
 ========================= */
 function goNextLevel() {
   const unlocked = getUnlocked();
@@ -647,7 +930,7 @@ function downloadAnswerSheetWithResponses() {
 }
 
 /* =========================
-   HTML 安全處理
+   HTML安全處理
 ========================= */
 function escapeHtml(str) {
   return String(str)
