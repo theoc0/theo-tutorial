@@ -11,6 +11,7 @@ let started = false;
 let submitted = false;
 let startTime = null;
 let timerInterval = null;
+let activeLevel = 1;
 
 const bankSelect = document.getElementById("bankSelect");
 const bankStatus = document.getElementById("bankStatus");
@@ -96,7 +97,8 @@ function defaultProgressData() {
 
 function loadProgressData() {
   try {
-    return JSON.parse(localStorage.getItem(getStorageKey())) || defaultProgressData();
+    const data = JSON.parse(localStorage.getItem(getStorageKey()));
+    return data || defaultProgressData();
   } catch {
     return defaultProgressData();
   }
@@ -182,6 +184,7 @@ function renderLevelMap(currentLevel, clearedLevels) {
 function renderProgressData() {
   const data = loadProgressData();
   const lv = data.currentLv || 1;
+
   currentLvEl.textContent = `LV ${lv}`;
   bestScoreEl.textContent = data.bestScore || 0;
   lastScoreEl.textContent = data.lastScore || 0;
@@ -236,6 +239,8 @@ function getAvailableBanks() {
 }
 
 function renderBankOptions() {
+  if (!bankSelect) return;
+
   bankSelect.innerHTML = "";
   const banks = getAvailableBanks();
 
@@ -245,7 +250,7 @@ function renderBankOptions() {
     option.textContent = "沒有可用題庫";
     bankSelect.appendChild(option);
     bankStatus.textContent = "未載入題庫。";
-    startBtn.disabled = true;
+    if (startBtn) startBtn.disabled = true;
     return;
   }
 
@@ -291,11 +296,11 @@ function formatTime(sec) {
 function startTimer() {
   stopTimer();
   startTime = Date.now();
-  timerEl.textContent = "00:00";
+  if (timerEl) timerEl.textContent = "00:00";
 
   timerInterval = setInterval(() => {
     const used = Math.floor((Date.now() - startTime) / 1000);
-    timerEl.textContent = formatTime(used);
+    if (timerEl) timerEl.textContent = formatTime(used);
   }, 1000);
 }
 
@@ -318,7 +323,7 @@ function resumeTimer() {
 
   timerInterval = setInterval(() => {
     const used = Math.floor((Date.now() - startTime) / 1000);
-    timerEl.textContent = formatTime(used);
+    if (timerEl) timerEl.textContent = formatTime(used);
   }, 1000);
 }
 
@@ -340,16 +345,16 @@ function updateProgress() {
   const total = currentQuestions.length || 0;
   const percent = total > 0 ? (answered / total) * 100 : 0;
 
-  progressText.textContent = `${answered} / ${total}`;
-  progressFill.style.width = `${percent}%`;
-  currentQNo.textContent = total > 0 ? `${currentQuestionIndex + 1} / ${total}` : "0";
-  answeredCountEl.textContent = answered;
-  currentLevelText.textContent = `${getCurrentLevel()} / ${TOTAL_LEVELS}`;
+  if (progressText) progressText.textContent = `${answered} / ${total}`;
+  if (progressFill) progressFill.style.width = `${percent}%`;
+  if (currentQNo) currentQNo.textContent = total > 0 ? `${currentQuestionIndex + 1} / ${total}` : "0";
+  if (answeredCountEl) answeredCountEl.textContent = answered;
+  if (currentLevelText) currentLevelText.textContent = `${activeLevel} / ${TOTAL_LEVELS}`;
 }
 
 function updateNavButtons() {
-  prevBtn.disabled = !started || currentQuestionIndex === 0;
-  nextBtn.disabled = !started || currentQuestionIndex >= currentQuestions.length - 1;
+  if (prevBtn) prevBtn.disabled = !started || currentQuestionIndex === 0;
+  if (nextBtn) nextBtn.disabled = !started || currentQuestionIndex >= currentQuestions.length - 1;
 }
 
 function askSubmitOnLastQuestion() {
@@ -424,7 +429,8 @@ function renderSingleQuestion(direction = "right") {
       userAnswers[currentQuestionIndex] = Number(radio.value);
 
       optionLabels.forEach(label => label.classList.remove("selected"));
-      radio.closest(".option").classList.add("selected");
+      const parent = radio.closest(".option");
+      if (parent) parent.classList.add("selected");
 
       updateProgress();
 
@@ -454,6 +460,7 @@ function startLevel(level) {
     return;
   }
 
+  activeLevel = level;
   currentQuestions = buildQuestionsForLevel(allQuestions, level);
 
   started = true;
@@ -477,8 +484,7 @@ function startLevel(level) {
 }
 
 function startQuiz() {
-  const level = getCurrentLevel();
-  startLevel(level);
+  startLevel(getCurrentLevel());
 }
 
 function goPrev() {
@@ -524,7 +530,7 @@ function buildResultData() {
   return {
     studentName: studentNameInput.value.trim(),
     paper: currentBankName,
-    level: getCurrentLevel(),
+    level: activeLevel,
     score,
     total,
     percentage,
@@ -557,16 +563,15 @@ function renderResult(result, levelInfo) {
     clearConditionText.textContent = "本關未能全對，需重新闖關。重考會重新抽題。";
   }
 
+  nextLevelBtn.classList.add("hidden");
+  retryLevelBtn.classList.add("hidden");
+
   if (result.passed && result.level < TOTAL_LEVELS) {
     nextLevelBtn.classList.remove("hidden");
-  } else {
-    nextLevelBtn.classList.add("hidden");
   }
 
   if (!result.passed) {
     retryLevelBtn.classList.remove("hidden");
-  } else {
-    retryLevelBtn.classList.add("hidden");
   }
 
   const wrongList = document.getElementById("wrongList");
@@ -636,6 +641,7 @@ function resetAll() {
   currentQuestions = [];
   currentQuestionIndex = 0;
   userAnswers = [];
+  activeLevel = getCurrentLevel();
 
   quizTitle.textContent = "請先開始作答";
   quizMeta.textContent = "選擇題庫後開始";
@@ -663,19 +669,19 @@ function goNextLevel() {
 }
 
 function retryCurrentLevel() {
-  const level = buildResultData().level;
-  startLevel(level);
+  startLevel(activeLevel);
 }
 
-bankSelect.addEventListener("change", updateBankStatus);
-startBtn.addEventListener("click", startQuiz);
-submitBtn.addEventListener("click", submitQuiz);
-resetBtn.addEventListener("click", resetAll);
-prevBtn.addEventListener("click", goPrev);
-nextBtn.addEventListener("click", goNext);
-nextLevelBtn.addEventListener("click", goNextLevel);
-retryLevelBtn.addEventListener("click", retryCurrentLevel);
+if (bankSelect) bankSelect.addEventListener("change", updateBankStatus);
+if (startBtn) startBtn.addEventListener("click", startQuiz);
+if (submitBtn) submitBtn.addEventListener("click", submitQuiz);
+if (resetBtn) resetBtn.addEventListener("click", resetAll);
+if (prevBtn) prevBtn.addEventListener("click", goPrev);
+if (nextBtn) nextBtn.addEventListener("click", goNext);
+if (nextLevelBtn) nextLevelBtn.addEventListener("click", goNextLevel);
+if (retryLevelBtn) retryLevelBtn.addEventListener("click", retryCurrentLevel);
 
 renderBankOptions();
 renderProgressData();
 updateProgress();
+resetAll();
