@@ -122,6 +122,8 @@ function getStars(percentage) {
 }
 
 function renderBadgeGrid(level) {
+  if (!badgeGrid) return;
+
   const badges = [
     { lv: 1, icon: "🌱", name: "起步" },
     { lv: 10, icon: "📘", name: "穩進" },
@@ -145,6 +147,8 @@ function renderBadgeGrid(level) {
 }
 
 function renderLevelScoreList(levelScores) {
+  if (!levelScoreList) return;
+
   levelScoreList.innerHTML = "";
   const entries = Object.entries(levelScores).sort((a, b) => Number(a[0]) - Number(b[0]));
 
@@ -165,12 +169,14 @@ function renderLevelScoreList(levelScores) {
 }
 
 function renderLevelMap(currentLevel, clearedLevels) {
+  if (!levelMap) return;
+
   levelMap.innerHTML = "";
 
   for (let i = 1; i <= TOTAL_LEVELS; i++) {
     const div = document.createElement("div");
-
     let state = "locked";
+
     if (clearedLevels.includes(i)) state = "cleared";
     else if (i === currentLevel) state = "current";
     else if (i < currentLevel) state = "cleared";
@@ -185,15 +191,15 @@ function renderProgressData() {
   const data = loadProgressData();
   const lv = data.currentLv || 1;
 
-  currentLvEl.textContent = `LV ${lv}`;
-  bestScoreEl.textContent = data.bestScore || 0;
-  lastScoreEl.textContent = data.lastScore || 0;
-  passedCountEl.textContent = safeArray(data.clearedLevels).length;
+  if (currentLvEl) currentLvEl.textContent = `LV ${lv}`;
+  if (bestScoreEl) bestScoreEl.textContent = data.bestScore || 0;
+  if (lastScoreEl) lastScoreEl.textContent = data.lastScore || 0;
+  if (passedCountEl) passedCountEl.textContent = safeArray(data.clearedLevels).length;
 
   renderBadgeGrid(lv);
   renderLevelScoreList(data.levelScores || {});
   renderLevelMap(lv, safeArray(data.clearedLevels));
-  currentLevelText.textContent = `${lv} / ${TOTAL_LEVELS}`;
+  if (currentLevelText) currentLevelText.textContent = `${lv} / ${TOTAL_LEVELS}`;
 }
 
 function getCurrentLevel() {
@@ -249,7 +255,7 @@ function renderBankOptions() {
     option.value = "";
     option.textContent = "沒有可用題庫";
     bankSelect.appendChild(option);
-    bankStatus.textContent = "未載入題庫。";
+    if (bankStatus) bankStatus.textContent = "未載入題庫。";
     if (startBtn) startBtn.disabled = true;
     return;
   }
@@ -269,21 +275,23 @@ function renderBankOptions() {
 }
 
 function updateBankStatus() {
+  if (!bankSelect) return;
+
   const bankName = bankSelect.value;
   const questions = safeArray((QUESTION_BANKS || {})[bankName]);
 
   if (!bankName) {
-    bankStatus.textContent = "未選擇題庫。";
-    startBtn.disabled = true;
+    if (bankStatus) bankStatus.textContent = "未選擇題庫。";
+    if (startBtn) startBtn.disabled = true;
     return;
   }
 
   if (questions.length < BANK_MIN_QUESTIONS) {
-    bankStatus.textContent = `此題庫題目少於 ${BANK_MIN_QUESTIONS} 題，已禁用。`;
-    startBtn.disabled = true;
+    if (bankStatus) bankStatus.textContent = `此題庫題目少於 ${BANK_MIN_QUESTIONS} 題，已禁用。`;
+    if (startBtn) startBtn.disabled = true;
   } else {
-    bankStatus.textContent = `此題庫可用，系統將按關卡難度抽取 ${QUESTIONS_PER_RUN} 題。通關條件：全對。`;
-    startBtn.disabled = false;
+    if (bankStatus) bankStatus.textContent = `此題庫可用，系統將按關卡難度抽取 ${QUESTIONS_PER_RUN} 題。通關條件：全對。`;
+    if (startBtn) startBtn.disabled = false;
   }
 }
 
@@ -328,6 +336,11 @@ function resumeTimer() {
 }
 
 function validateStudentInfo() {
+  if (!studentNameInput) {
+    alert("找不到學生姓名輸入欄位，請確認 index.html。");
+    return false;
+  }
+
   const studentName = studentNameInput.value.trim();
   if (!studentName) {
     alert("請先填寫學生姓名。");
@@ -393,6 +406,8 @@ function buildQuestionsForLevel(allQuestions, level) {
 }
 
 function renderSingleQuestion(direction = "right") {
+  if (!singleQuestionWrap) return;
+
   singleQuestionWrap.innerHTML = "";
 
   if (!started || !currentQuestions.length) {
@@ -451,6 +466,7 @@ function renderSingleQuestion(direction = "right") {
 
 function startLevel(level) {
   if (!validateStudentInfo()) return;
+  if (!bankSelect) return;
 
   currentBankName = bankSelect.value;
   const allQuestions = safeArray((QUESTION_BANKS || {})[currentBankName]);
@@ -468,18 +484,17 @@ function startLevel(level) {
   currentQuestionIndex = 0;
   userAnswers = new Array(currentQuestions.length).fill(null);
 
-  quizTitle.textContent = `${currentBankName}｜第 ${level} 關`;
-  quizMeta.textContent = `共 ${currentQuestions.length} 題｜一題一頁闖關模式`;
+  if (quizTitle) quizTitle.textContent = `${currentBankName}｜第 ${level} 關`;
+  if (quizMeta) quizMeta.textContent = `共 ${currentQuestions.length} 題｜一題一頁闖關模式`;
 
-  resultSection.classList.add("hidden");
-  levelUpBox.classList.add("hidden");
-  nextLevelBtn.classList.add("hidden");
-  retryLevelBtn.classList.add("hidden");
-  submitBtn.disabled = false;
+  if (resultSection) resultSection.classList.add("hidden");
+  if (levelUpBox) levelUpBox.classList.add("hidden");
+  if (nextLevelBtn) nextLevelBtn.classList.add("hidden");
+  if (retryLevelBtn) retryLevelBtn.classList.add("hidden");
+  if (submitBtn) submitBtn.disabled = false;
 
   renderSingleQuestion("right");
   startTimer();
-
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -510,7 +525,7 @@ function buildResultData() {
     if (correct) {
       score++;
     } else {
-      wrongQuestions.push({
+        wrongQuestions.push({
         index: i + 1,
         cat: q.cat || "",
         type: q.type || "",
@@ -528,7 +543,7 @@ function buildResultData() {
   const passed = wrongQuestions.length === 0;
 
   return {
-    studentName: studentNameInput.value.trim(),
+    studentName: studentNameInput ? studentNameInput.value.trim() : "",
     paper: currentBankName,
     level: activeLevel,
     score,
@@ -541,60 +556,69 @@ function buildResultData() {
 }
 
 function renderResult(result, levelInfo) {
-  document.getElementById("rName").textContent = result.studentName;
-  document.getElementById("rLevel").textContent = `第 ${result.level} 關`;
-  document.getElementById("rPaper").textContent = result.paper;
-  document.getElementById("rScore").textContent = `${result.score} / ${result.total}（${result.percentage}%）`;
-  document.getElementById("rTime").textContent = `${result.timeUsed} 秒`;
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
+
+  setText("rName", result.studentName);
+  setText("rLevel", `第 ${result.level} 關`);
+  setText("rPaper", result.paper);
+  setText("rScore", `${result.score} / ${result.total}（${result.percentage}%）`);
+  setText("rTime", `${result.timeUsed} 秒`);
 
   const starInfo = getStars(levelInfo.percentage);
-  starValue.textContent = starInfo.stars;
-  starDesc.textContent = starInfo.desc;
-  document.getElementById("rStars").textContent = starInfo.stars;
+  if (starValue) starValue.textContent = starInfo.stars;
+  if (starDesc) starDesc.textContent = starInfo.desc;
+  setText("rStars", starInfo.stars);
 
   if (result.passed) {
-    levelUpText.textContent = result.level < TOTAL_LEVELS
-      ? `恭喜通過第 ${result.level} 關！`
-      : `恭喜完成最終第 ${result.level} 關！`;
-    levelUpBox.classList.remove("hidden");
-    clearConditionText.textContent = "本關全對，成功通關！可前往下一關。";
+    if (levelUpText) {
+      levelUpText.textContent = result.level < TOTAL_LEVELS
+        ? `恭喜通過第 ${result.level} 關！`
+        : `恭喜完成最終第 ${result.level} 關！`;
+    }
+    if (levelUpBox) levelUpBox.classList.remove("hidden");
+    if (clearConditionText) clearConditionText.textContent = "本關全對，成功通關！可前往下一關。";
   } else {
-    levelUpBox.classList.add("hidden");
-    clearConditionText.textContent = "本關未能全對，需重新闖關。重考會重新抽題。";
+    if (levelUpBox) levelUpBox.classList.add("hidden");
+    if (clearConditionText) clearConditionText.textContent = "本關未能全對，需重新闖關。重考會重新抽題。";
   }
 
-  nextLevelBtn.classList.add("hidden");
-  retryLevelBtn.classList.add("hidden");
+  if (nextLevelBtn) nextLevelBtn.classList.add("hidden");
+  if (retryLevelBtn) retryLevelBtn.classList.add("hidden");
 
-  if (result.passed && result.level < TOTAL_LEVELS) {
+  if (result.passed && result.level < TOTAL_LEVELS && nextLevelBtn) {
     nextLevelBtn.classList.remove("hidden");
   }
 
-  if (!result.passed) {
+  if (!result.passed && retryLevelBtn) {
     retryLevelBtn.classList.remove("hidden");
   }
 
   const wrongList = document.getElementById("wrongList");
-  wrongList.innerHTML = "";
+  if (wrongList) {
+    wrongList.innerHTML = "";
 
-  if (!result.wrongQuestions.length) {
-    wrongList.innerHTML = `<div class="wrong-item">全對，做得很好！</div>`;
-  } else {
-    result.wrongQuestions.forEach(item => {
-      const div = document.createElement("div");
-      div.className = "wrong-item";
-      div.innerHTML = `
-        <strong>第 ${item.index} 題【${item.cat}｜${item.type}】</strong>
-        <p>${item.question}</p>
-        <p><strong>你的答案：</strong>${item.studentAnswer}</p>
-        <p><strong>正確答案：</strong>${item.correctAnswer}</p>
-        <p><strong>解說：</strong>${item.explanation}</p>
-      `;
-      wrongList.appendChild(div);
-    });
+    if (!result.wrongQuestions.length) {
+      wrongList.innerHTML = `<div class="wrong-item">全對，做得很好！</div>`;
+    } else {
+      result.wrongQuestions.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "wrong-item";
+        div.innerHTML = `
+          <strong>第 ${item.index} 題【${item.cat}｜${item.type}】</strong>
+          <p>${item.question}</p>
+          <p><strong>你的答案：</strong>${item.studentAnswer}</p>
+          <p><strong>正確答案：</strong>${item.correctAnswer}</p>
+          <p><strong>解說：</strong>${item.explanation}</p>
+        `;
+        wrongList.appendChild(div);
+      });
+    }
   }
 
-  resultSection.classList.remove("hidden");
+  if (resultSection) resultSection.classList.remove("hidden");
 }
 
 function submitQuiz() {
@@ -621,13 +645,13 @@ function submitQuiz() {
 
   const result = buildResultData();
   submitted = true;
-  submitBtn.disabled = true;
+  if (submitBtn) submitBtn.disabled = true;
 
   const levelInfo = updateAfterResult(result.level, result.percentage, result.passed);
   renderResult(result, levelInfo);
 
   window.scrollTo({
-    top: resultSection.offsetTop - 12,
+    top: resultSection ? resultSection.offsetTop - 12 : 0,
     behavior: "smooth"
   });
 }
@@ -643,24 +667,26 @@ function resetAll() {
   userAnswers = [];
   activeLevel = getCurrentLevel();
 
-  quizTitle.textContent = "請先開始作答";
-  quizMeta.textContent = "選擇題庫後開始";
-  singleQuestionWrap.innerHTML = `<div class="empty-state">請先輸入姓名並按「開始闖關」。</div>`;
-  timerEl.textContent = "00:00";
+  if (quizTitle) quizTitle.textContent = "請先開始作答";
+  if (quizMeta) quizMeta.textContent = "選擇題庫後開始";
+  if (singleQuestionWrap) {
+    singleQuestionWrap.innerHTML = `<div class="empty-state">請先輸入姓名並按「開始闖關」。</div>`;
+  }
+  if (timerEl) timerEl.textContent = "00:00";
 
-  progressText.textContent = "0 / 0";
-  progressFill.style.width = "0%";
-  currentQNo.textContent = "0";
-  answeredCountEl.textContent = "0";
+  if (progressText) progressText.textContent = "0 / 0";
+  if (progressFill) progressFill.style.width = "0%";
+  if (currentQNo) currentQNo.textContent = "0";
+  if (answeredCountEl) answeredCountEl.textContent = "0";
 
-  submitBtn.disabled = true;
-  prevBtn.disabled = true;
-  nextBtn.disabled = true;
+  if (submitBtn) submitBtn.disabled = true;
+  if (prevBtn) prevBtn.disabled = true;
+  if (nextBtn) nextBtn.disabled = true;
 
-  resultSection.classList.add("hidden");
-  levelUpBox.classList.add("hidden");
-  nextLevelBtn.classList.add("hidden");
-  retryLevelBtn.classList.add("hidden");
+  if (resultSection) resultSection.classList.add("hidden");
+  if (levelUpBox) levelUpBox.classList.add("hidden");
+  if (nextLevelBtn) nextLevelBtn.classList.add("hidden");
+  if (retryLevelBtn) retryLevelBtn.classList.add("hidden");
 }
 
 function goNextLevel() {
