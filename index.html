@@ -7,78 +7,139 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="container">
-    <header class="topbar">
-      <h1>中文闖關遊戲</h1>
-      <div class="top-links">
-        <a href="teacher.html" class="btn ghost">教師後台</a>
-      </div>
-    </header>
+  <div class="page-bg">
+    <div class="app-shell">
+      <header class="top-hero">
+        <div class="hero-sub">SHAPING INSPIRATION</div>
+        <h1>中文闖關遊戲</h1>
+        <p>中國語文練習平台</p>
+      </header>
 
-    <section class="card">
-      <h2>學生資料</h2>
-      <div class="grid-3">
-        <div>
-          <label>姓名</label>
-          <input id="studentName" type="text" placeholder="例如：陳大文" />
+      <section class="setup-card">
+        <div class="setup-grid">
+          <div class="field">
+            <label for="studentName">姓名</label>
+            <input id="studentName" type="text" placeholder="例如：陳大文" />
+          </div>
+          <div class="field">
+            <label for="className">班別</label>
+            <input id="className" type="text" placeholder="例如：6A" />
+          </div>
+          <div class="field">
+            <label for="studentNo">學號</label>
+            <input id="studentNo" type="text" placeholder="例如：12" />
+          </div>
+          <div class="field">
+            <label for="bankSelect">題庫</label>
+            <select id="bankSelect"></select>
+            <div id="bankStatus" class="helper-text"></div>
+          </div>
         </div>
-        <div>
-          <label>班別</label>
-          <input id="className" type="text" placeholder="例如：6A" />
-        </div>
-        <div>
-          <label>學號</label>
-          <input id="studentNo" type="text" placeholder="例如：12" />
-        </div>
-      </div>
-    </section>
 
-    <section class="card">
-      <h2>選擇題庫</h2>
-      <div class="grid-2">
-        <div>
-          <label>題庫</label>
-          <select id="bankSelect"></select>
-          <small id="bankStatus" class="muted"></small>
+        <div class="setup-actions">
+          <button id="startBtn" class="btn btn-primary">開始闖關</button>
+          <button id="submitBtn" class="btn btn-accent" disabled>提交試卷</button>
+          <button id="resetBtn" class="btn btn-outline">重新開始</button>
         </div>
-        <div class="actions">
-          <button id="startBtn" class="btn">開始作答</button>
-          <button id="submitBtn" class="btn success" disabled>提交成績</button>
-          <button id="resetBtn" class="btn danger">重設</button>
-        </div>
-      </div>
-    </section>
+      </section>
 
-    <section id="quizSection" class="card hidden">
-      <div class="quiz-head">
-        <div>
-          <h2 id="quizTitle">試卷</h2>
-          <p id="quizMeta" class="muted"></p>
-        </div>
-        <div class="timer-box">
-          <span>作答時間</span>
-          <strong id="timer">00:00</strong>
-        </div>
-      </div>
+      <main class="game-layout">
+        <!-- 左側：通關記錄 -->
+        <aside class="side-panel left-panel">
+          <div class="panel-card">
+            <h2>通關記錄</h2>
+            <div class="record-box">
+              <div class="record-item">
+                <span>目前 LV</span>
+                <strong id="currentLv">LV 0</strong>
+              </div>
+              <div class="record-item">
+                <span>最高分數</span>
+                <strong id="bestScore">0</strong>
+              </div>
+              <div class="record-item">
+                <span>最近分數</span>
+                <strong id="lastScore">0</strong>
+              </div>
+            </div>
+          </div>
+        </aside>
 
-      <div id="questionList"></div>
-    </section>
+        <!-- 中間：答題區 -->
+        <section class="center-panel">
+          <div class="quiz-card">
+            <div class="quiz-head">
+              <div>
+                <h2 id="quizTitle">請先開始作答</h2>
+                <p id="quizMeta" class="helper-text">選擇題庫後開始</p>
+              </div>
+            </div>
 
-    <section id="resultSection" class="card hidden">
-      <h2>作答結果</h2>
-      <div class="result-grid">
-        <div class="result-item"><span>姓名</span><strong id="rName">-</strong></div>
-        <div class="result-item"><span>班別</span><strong id="rClass">-</strong></div>
-        <div class="result-item"><span>學號</span><strong id="rNo">-</strong></div>
-        <div class="result-item"><span>題庫</span><strong id="rPaper">-</strong></div>
-        <div class="result-item"><span>分數</span><strong id="rScore">-</strong></div>
-        <div class="result-item"><span>時間</span><strong id="rTime">-</strong></div>
-      </div>
-      <div>
-        <h3>錯題</h3>
-        <div id="wrongList" class="wrong-list"></div>
-      </div>
-    </section>
+            <div id="questionList" class="question-list">
+              <div class="empty-state">
+                請先填寫學生資料並按「開始闖關」。
+              </div>
+            </div>
+          </div>
+
+          <div id="resultSection" class="result-card hidden">
+            <h2>本次結果</h2>
+            <div class="result-grid">
+              <div class="result-item">
+                <span>姓名</span>
+                <strong id="rName">-</strong>
+              </div>
+              <div class="result-item">
+                <span>班別</span>
+                <strong id="rClass">-</strong>
+              </div>
+              <div class="result-item">
+                <span>學號</span>
+                <strong id="rNo">-</strong>
+              </div>
+              <div class="result-item">
+                <span>題庫</span>
+                <strong id="rPaper">-</strong>
+              </div>
+              <div class="result-item">
+                <span>分數</span>
+                <strong id="rScore">-</strong>
+              </div>
+              <div class="result-item">
+                <span>時間</span>
+                <strong id="rTime">-</strong>
+              </div>
+            </div>
+
+            <div class="wrong-area">
+              <h3>錯題重溫</h3>
+              <div id="wrongList"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 右側：進度與計時 -->
+        <aside class="side-panel right-panel">
+          <div class="panel-card">
+            <h2>作答進度</h2>
+            <div class="progress-wrap">
+              <div class="progress-label">
+                <span>本關進度</span>
+                <strong id="progressText">0 / 0</strong>
+              </div>
+              <div class="progress-bar">
+                <div id="progressFill" class="progress-fill"></div>
+              </div>
+            </div>
+
+            <div class="timer-wrap">
+              <span>正計時</span>
+              <strong id="timer">00:00</strong>
+            </div>
+          </div>
+        </aside>
+      </main>
+    </div>
   </div>
 
   <script src="question-banks.js"></script>
