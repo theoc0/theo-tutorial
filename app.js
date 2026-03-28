@@ -1,5 +1,6 @@
 const BANK_MIN_QUESTIONS = 50;
 const QUESTIONS_PER_RUN = 30;
+const TOTAL_LEVELS = 50;
 const AUTO_NEXT_DELAY = 260;
 
 let currentBankName = "";
@@ -10,7 +11,6 @@ let started = false;
 let submitted = false;
 let startTime = null;
 let timerInterval = null;
-let lastDirection = "right";
 
 const bankSelect = document.getElementById("bankSelect");
 const bankStatus = document.getElementById("bankStatus");
@@ -19,10 +19,10 @@ const submitBtn = document.getElementById("submitBtn");
 const resetBtn = document.getElementById("resetBtn");
 const prevBtn = document.getElementById("prevBtn");
 const nextBtn = document.getElementById("nextBtn");
+const nextLevelBtn = document.getElementById("nextLevelBtn");
+const retryLevelBtn = document.getElementById("retryLevelBtn");
 
 const studentNameInput = document.getElementById("studentName");
-const classNameInput = document.getElementById("className");
-const studentNoInput = document.getElementById("studentNo");
 
 const quizTitle = document.getElementById("quizTitle");
 const quizMeta = document.getElementById("quizMeta");
@@ -33,6 +33,7 @@ const progressText = document.getElementById("progressText");
 const progressFill = document.getElementById("progressFill");
 const currentQNo = document.getElementById("currentQNo");
 const answeredCountEl = document.getElementById("answeredCount");
+const currentLevelText = document.getElementById("currentLevelText");
 
 const resultSection = document.getElementById("resultSection");
 const levelUpBox = document.getElementById("levelUpBox");
@@ -41,10 +42,14 @@ const levelUpText = document.getElementById("levelUpText");
 const currentLvEl = document.getElementById("currentLv");
 const bestScoreEl = document.getElementById("bestScore");
 const lastScoreEl = document.getElementById("lastScore");
+const passedCountEl = document.getElementById("passedCount");
 const badgeGrid = document.getElementById("badgeGrid");
+const levelScoreList = document.getElementById("levelScoreList");
+const levelMap = document.getElementById("levelMap");
 
 const starValue = document.getElementById("starValue");
 const starDesc = document.getElementById("starDesc");
+const clearConditionText = document.getElementById("clearConditionText");
 
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
@@ -57,11 +62,6 @@ function shuffleArray(arr) {
     [clone[i], clone[j]] = [clone[j], clone[i]];
   }
   return clone;
-}
-
-function sampleQuestions(arr, count) {
-  const shuffled = shuffleArray(arr);
-  return shuffled.slice(0, Math.min(count, shuffled.length));
 }
 
 function shuffleQuestionOptions(question) {
@@ -81,22 +81,24 @@ function shuffleQuestionOptions(question) {
 }
 
 function getStorageKey() {
-  return "chinese_game_progress";
+  return "chinese_game_progress_v3";
+}
+
+function defaultProgressData() {
+  return {
+    bestScore: 0,
+    lastScore: 0,
+    currentLv: 1,
+    levelScores: {},
+    clearedLevels: []
+  };
 }
 
 function loadProgressData() {
   try {
-    return JSON.parse(localStorage.getItem(getStorageKey())) || {
-      bestScore: 0,
-      lastScore: 0,
-      currentLv: 0
-    };
+    return JSON.parse(localStorage.getItem(getStorageKey())) || defaultProgressData();
   } catch {
-    return {
-      bestScore: 0,
-      lastScore: 0,
-      currentLv: 0
-    };
+    return defaultProgressData();
   }
 }
 
@@ -104,38 +106,34 @@ function saveProgressData(data) {
   localStorage.setItem(getStorageKey(), JSON.stringify(data));
 }
 
-function getLevelFromPercentage(percentage) {
-  if (percentage >= 90) return 5;
-  if (percentage >= 80) return 4;
-  if (percentage >= 70) return 3;
-  if (percentage >= 60) return 2;
-  if (percentage > 0) return 1;
-  return 0;
-}
-
 function getStars(percentage) {
-  if (percentage >= 85) {
-    return { stars: "★★★", desc: "表現出色！" };
-  }
-  if (percentage >= 60) {
-    return { stars: "★★☆", desc: "表現不錯，繼續努力！" };
-  }
-  return { stars: "★☆☆", desc: "再接再厲，下次更進一步！" };
+  const starCount = Math.max(1, Math.ceil(percentage / 20));
+  const stars = "★★★★★".slice(0, starCount) + "☆☆☆☆☆".slice(0, 5 - starCount);
+
+  let desc = "再接再厲，下次更進一步！";
+  if (starCount === 5) desc = "表現出色！";
+  else if (starCount === 4) desc = "表現很好，快要滿星！";
+  else if (starCount === 3) desc = "表現不錯，繼續努力！";
+  else if (starCount === 2) desc = "已有進步，繼續加油！";
+
+  return { stars, desc, starCount };
 }
 
 function renderBadgeGrid(level) {
   const badges = [
-    { lv: 1, icon: "🌱", name: "初學萌芽" },
-    { lv: 2, icon: "📘", name: "穩步前行" },
-    { lv: 3, icon: "🧠", name: "語文進階" },
-    { lv: 4, icon: "🏅", name: "高分挑戰" },
-    { lv: 5, icon: "👑", name: "闖關王者" }
+    { lv: 1, icon: "🌱", name: "起步" },
+    { lv: 10, icon: "📘", name: "穩進" },
+    { lv: 20, icon: "🧠", name: "進階" },
+    { lv: 30, icon: "🏅", name: "高手" },
+    { lv: 40, icon: "🚀", name: "衝刺" },
+    { lv: 50, icon: "👑", name: "通關王" }
   ];
 
   badgeGrid.innerHTML = "";
   badges.forEach(badge => {
+    const unlocked = level >= badge.lv;
     const div = document.createElement("div");
-    div.className = `badge-item ${level >= badge.lv ? "unlocked" : "locked"}`;
+    div.className = `badge-item ${unlocked ? "unlocked" : "locked"}`;
     div.innerHTML = `
       <div class="badge-icon">${badge.icon}</div>
       <div class="badge-name">LV ${badge.lv}<br>${badge.name}</div>
@@ -144,30 +142,88 @@ function renderBadgeGrid(level) {
   });
 }
 
+function renderLevelScoreList(levelScores) {
+  levelScoreList.innerHTML = "";
+  const entries = Object.entries(levelScores).sort((a, b) => Number(a[0]) - Number(b[0]));
+
+  if (!entries.length) {
+    levelScoreList.innerHTML = `<div class="level-score-empty">尚未有通關記錄。</div>`;
+    return;
+  }
+
+  entries.forEach(([lv, score]) => {
+    const div = document.createElement("div");
+    div.className = "level-score-item";
+    div.innerHTML = `
+      <span>第 ${lv} 關</span>
+      <strong>${score}%</strong>
+    `;
+    levelScoreList.appendChild(div);
+  });
+}
+
+function renderLevelMap(currentLevel, clearedLevels) {
+  levelMap.innerHTML = "";
+
+  for (let i = 1; i <= TOTAL_LEVELS; i++) {
+    const div = document.createElement("div");
+
+    let state = "locked";
+    if (clearedLevels.includes(i)) state = "cleared";
+    else if (i === currentLevel) state = "current";
+    else if (i < currentLevel) state = "cleared";
+
+    div.className = `map-node ${state}`;
+    div.textContent = i;
+    levelMap.appendChild(div);
+  }
+}
+
 function renderProgressData() {
   const data = loadProgressData();
-  const lv = data.currentLv || 0;
+  const lv = data.currentLv || 1;
   currentLvEl.textContent = `LV ${lv}`;
   bestScoreEl.textContent = data.bestScore || 0;
   lastScoreEl.textContent = data.lastScore || 0;
+  passedCountEl.textContent = safeArray(data.clearedLevels).length;
+
   renderBadgeGrid(lv);
+  renderLevelScoreList(data.levelScores || {});
+  renderLevelMap(lv, safeArray(data.clearedLevels));
+  currentLevelText.textContent = `${lv} / ${TOTAL_LEVELS}`;
 }
 
-function updateGameLevel(score, total) {
-  const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
+function getCurrentLevel() {
   const data = loadProgressData();
-  const oldLv = data.currentLv || 0;
+  return Math.min(data.currentLv || 1, TOTAL_LEVELS);
+}
+
+function updateAfterResult(level, percentage, passed) {
+  const data = loadProgressData();
+  const oldLevel = data.currentLv || 1;
 
   data.lastScore = percentage;
   if (percentage > (data.bestScore || 0)) data.bestScore = percentage;
+  data.levelScores[level] = percentage;
 
-  const newLv = Math.max(oldLv, getLevelFromPercentage(percentage));
-  data.currentLv = newLv;
+  if (passed) {
+    if (!safeArray(data.clearedLevels).includes(level)) {
+      data.clearedLevels.push(level);
+    }
+    if (level === oldLevel && oldLevel < TOTAL_LEVELS) {
+      data.currentLv = oldLevel + 1;
+    }
+  }
 
   saveProgressData(data);
   renderProgressData();
 
-  return { oldLv, newLv, percentage };
+  return {
+    oldLevel,
+    newLevel: data.currentLv,
+    percentage,
+    passed
+  };
 }
 
 function getAvailableBanks() {
@@ -221,7 +277,7 @@ function updateBankStatus() {
     bankStatus.textContent = `此題庫題目少於 ${BANK_MIN_QUESTIONS} 題，已禁用。`;
     startBtn.disabled = true;
   } else {
-    bankStatus.textContent = `此題庫可用，系統將隨機抽取 ${Math.min(QUESTIONS_PER_RUN, questions.length)} 題。`;
+    bankStatus.textContent = `此題庫可用，系統將按關卡難度抽取 ${QUESTIONS_PER_RUN} 題。通關條件：全對。`;
     startBtn.disabled = false;
   }
 }
@@ -268,11 +324,8 @@ function resumeTimer() {
 
 function validateStudentInfo() {
   const studentName = studentNameInput.value.trim();
-  const className = classNameInput.value.trim();
-  const studentNo = studentNoInput.value.trim();
-
-  if (!studentName || !className || !studentNo) {
-    alert("請先填寫姓名、班別、學號。");
+  if (!studentName) {
+    alert("請先填寫學生姓名。");
     return false;
   }
   return true;
@@ -291,6 +344,7 @@ function updateProgress() {
   progressFill.style.width = `${percent}%`;
   currentQNo.textContent = total > 0 ? `${currentQuestionIndex + 1} / ${total}` : "0";
   answeredCountEl.textContent = answered;
+  currentLevelText.textContent = `${getCurrentLevel()} / ${TOTAL_LEVELS}`;
 }
 
 function updateNavButtons() {
@@ -313,11 +367,31 @@ function askSubmitOnLastQuestion() {
   }, 180);
 }
 
+function getDifficultyTarget(level) {
+  if (level <= 10) return [1];
+  if (level <= 20) return [1, 2];
+  if (level <= 30) return [2];
+  if (level <= 40) return [2, 3, 4];
+  return [3, 4, 5];
+}
+
+function buildQuestionsForLevel(allQuestions, level) {
+  const targets = getDifficultyTarget(level);
+  let pool = allQuestions.filter(q => targets.includes(Number(q.diff || 1)));
+
+  if (pool.length < QUESTIONS_PER_RUN) {
+    pool = allQuestions;
+  }
+
+  const selected = shuffleArray(pool).slice(0, Math.min(QUESTIONS_PER_RUN, pool.length));
+  return selected.map(q => shuffleQuestionOptions(q));
+}
+
 function renderSingleQuestion(direction = "right") {
   singleQuestionWrap.innerHTML = "";
 
   if (!started || !currentQuestions.length) {
-    singleQuestionWrap.innerHTML = `<div class="empty-state">請先填寫學生資料並按「開始闖關」。</div>`;
+    singleQuestionWrap.innerHTML = `<div class="empty-state">請先輸入姓名並按「開始闖關」。</div>`;
     updateProgress();
     updateNavButtons();
     return;
@@ -369,7 +443,7 @@ function renderSingleQuestion(direction = "right") {
   updateNavButtons();
 }
 
-function startQuiz() {
+function startLevel(level) {
   if (!validateStudentInfo()) return;
 
   currentBankName = bankSelect.value;
@@ -380,24 +454,31 @@ function startQuiz() {
     return;
   }
 
-  currentQuestions = sampleQuestions(allQuestions, QUESTIONS_PER_RUN).map(q => shuffleQuestionOptions(q));
+  currentQuestions = buildQuestionsForLevel(allQuestions, level);
 
   started = true;
   submitted = false;
   currentQuestionIndex = 0;
   userAnswers = new Array(currentQuestions.length).fill(null);
 
-  quizTitle.textContent = currentBankName;
+  quizTitle.textContent = `${currentBankName}｜第 ${level} 關`;
   quizMeta.textContent = `共 ${currentQuestions.length} 題｜一題一頁闖關模式`;
 
   resultSection.classList.add("hidden");
   levelUpBox.classList.add("hidden");
+  nextLevelBtn.classList.add("hidden");
+  retryLevelBtn.classList.add("hidden");
   submitBtn.disabled = false;
 
   renderSingleQuestion("right");
   startTimer();
 
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function startQuiz() {
+  const level = getCurrentLevel();
+  startLevel(level);
 }
 
 function goPrev() {
@@ -438,24 +519,24 @@ function buildResultData() {
   const total = currentQuestions.length;
   const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
   const timeUsed = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+  const passed = wrongQuestions.length === 0;
 
   return {
     studentName: studentNameInput.value.trim(),
-    className: classNameInput.value.trim(),
-    studentNo: studentNoInput.value.trim(),
     paper: currentBankName,
+    level: getCurrentLevel(),
     score,
     total,
     percentage,
     timeUsed,
-    wrongQuestions
+    wrongQuestions,
+    passed
   };
 }
 
 function renderResult(result, levelInfo) {
   document.getElementById("rName").textContent = result.studentName;
-  document.getElementById("rClass").textContent = result.className;
-  document.getElementById("rNo").textContent = result.studentNo;
+  document.getElementById("rLevel").textContent = `第 ${result.level} 關`;
   document.getElementById("rPaper").textContent = result.paper;
   document.getElementById("rScore").textContent = `${result.score} / ${result.total}（${result.percentage}%）`;
   document.getElementById("rTime").textContent = `${result.timeUsed} 秒`;
@@ -463,12 +544,29 @@ function renderResult(result, levelInfo) {
   const starInfo = getStars(levelInfo.percentage);
   starValue.textContent = starInfo.stars;
   starDesc.textContent = starInfo.desc;
+  document.getElementById("rStars").textContent = starInfo.stars;
 
-  if (levelInfo.newLv > levelInfo.oldLv) {
-    levelUpText.textContent = `恭喜升上 LV ${levelInfo.newLv}！`;
+  if (result.passed) {
+    levelUpText.textContent = result.level < TOTAL_LEVELS
+      ? `恭喜通過第 ${result.level} 關！`
+      : `恭喜完成最終第 ${result.level} 關！`;
     levelUpBox.classList.remove("hidden");
+    clearConditionText.textContent = "本關全對，成功通關！可前往下一關。";
   } else {
     levelUpBox.classList.add("hidden");
+    clearConditionText.textContent = "本關未能全對，需重新闖關。重考會重新抽題。";
+  }
+
+  if (result.passed && result.level < TOTAL_LEVELS) {
+    nextLevelBtn.classList.remove("hidden");
+  } else {
+    nextLevelBtn.classList.add("hidden");
+  }
+
+  if (!result.passed) {
+    retryLevelBtn.classList.remove("hidden");
+  } else {
+    retryLevelBtn.classList.add("hidden");
   }
 
   const wrongList = document.getElementById("wrongList");
@@ -520,7 +618,7 @@ function submitQuiz() {
   submitted = true;
   submitBtn.disabled = true;
 
-  const levelInfo = updateGameLevel(result.score, result.total);
+  const levelInfo = updateAfterResult(result.level, result.percentage, result.passed);
   renderResult(result, levelInfo);
 
   window.scrollTo({
@@ -541,7 +639,7 @@ function resetAll() {
 
   quizTitle.textContent = "請先開始作答";
   quizMeta.textContent = "選擇題庫後開始";
-  singleQuestionWrap.innerHTML = `<div class="empty-state">請先填寫學生資料並按「開始闖關」。</div>`;
+  singleQuestionWrap.innerHTML = `<div class="empty-state">請先輸入姓名並按「開始闖關」。</div>`;
   timerEl.textContent = "00:00";
 
   progressText.textContent = "0 / 0";
@@ -555,6 +653,18 @@ function resetAll() {
 
   resultSection.classList.add("hidden");
   levelUpBox.classList.add("hidden");
+  nextLevelBtn.classList.add("hidden");
+  retryLevelBtn.classList.add("hidden");
+}
+
+function goNextLevel() {
+  const nextLevel = Math.min(getCurrentLevel(), TOTAL_LEVELS);
+  startLevel(nextLevel);
+}
+
+function retryCurrentLevel() {
+  const level = buildResultData().level;
+  startLevel(level);
 }
 
 bankSelect.addEventListener("change", updateBankStatus);
@@ -563,6 +673,8 @@ submitBtn.addEventListener("click", submitQuiz);
 resetBtn.addEventListener("click", resetAll);
 prevBtn.addEventListener("click", goPrev);
 nextBtn.addEventListener("click", goNext);
+nextLevelBtn.addEventListener("click", goNextLevel);
+retryLevelBtn.addEventListener("click", retryCurrentLevel);
 
 renderBankOptions();
 renderProgressData();
