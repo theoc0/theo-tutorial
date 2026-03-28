@@ -19,18 +19,10 @@
       </header>
 
       <section class="setup-card">
-        <div class="setup-grid">
+        <div class="setup-grid single-name-grid">
           <div class="field">
-            <label for="studentName">姓名</label>
+            <label for="studentName">學生姓名</label>
             <input id="studentName" type="text" placeholder="例如：陳大文" />
-          </div>
-          <div class="field">
-            <label for="className">班別</label>
-            <input id="className" type="text" placeholder="例如：6A" />
-          </div>
-          <div class="field">
-            <label for="studentNo">學號</label>
-            <input id="studentNo" type="text" placeholder="例如：12" />
           </div>
           <div class="field">
             <label for="bankSelect">題庫</label>
@@ -41,7 +33,6 @@
 
         <div class="setup-actions">
           <button id="startBtn" class="btn btn-primary">開始闖關</button>
-          <button id="submitBtn" class="btn btn-accent" disabled>提交試卷</button>
           <button id="resetBtn" class="btn btn-outline">重新開始</button>
         </div>
       </section>
@@ -54,7 +45,7 @@
 
             <div class="badge-level-box">
               <div class="level-ring">
-                <span id="currentLv">LV 0</span>
+                <span id="currentLv">LV 1</span>
               </div>
               <div class="level-summary">
                 <div class="summary-line">
@@ -65,11 +56,18 @@
                   <span>最近分數</span>
                   <strong id="lastScore">0</strong>
                 </div>
+                <div class="summary-line">
+                  <span>已通關層數</span>
+                  <strong id="passedCount">0</strong>
+                </div>
               </div>
             </div>
 
             <div class="badge-title">過關徽章</div>
             <div id="badgeGrid" class="badge-grid"></div>
+
+            <div class="badge-title level-score-title">各層分數記錄</div>
+            <div id="levelScoreList" class="level-score-list"></div>
           </div>
         </aside>
 
@@ -86,7 +84,7 @@
             <div id="questionStage" class="question-stage">
               <div id="singleQuestionWrap" class="single-question-wrap">
                 <div class="empty-state">
-                  請先填寫學生資料並按「開始闖關」。
+                  請先輸入姓名並按「開始闖關」。
                 </div>
               </div>
             </div>
@@ -105,7 +103,7 @@
 
             <div class="star-box" id="starBox">
               <div class="star-title">本次星級評價</div>
-              <div class="star-value" id="starValue">★★★</div>
+              <div class="star-value" id="starValue">★★★★★</div>
               <div class="star-desc" id="starDesc">表現出色！</div>
             </div>
 
@@ -117,12 +115,8 @@
                 <strong id="rName">-</strong>
               </div>
               <div class="result-item">
-                <span>班別</span>
-                <strong id="rClass">-</strong>
-              </div>
-              <div class="result-item">
-                <span>學號</span>
-                <strong id="rNo">-</strong>
+                <span>關卡</span>
+                <strong id="rLevel">-</strong>
               </div>
               <div class="result-item">
                 <span>題庫</span>
@@ -133,9 +127,17 @@
                 <strong id="rScore">-</strong>
               </div>
               <div class="result-item">
+                <span>星級</span>
+                <strong id="rStars">-</strong>
+              </div>
+              <div class="result-item">
                 <span>時間</span>
                 <strong id="rTime">-</strong>
               </div>
+            </div>
+
+            <div class="result-actions">
+              <button id="nextLevelBtn" class="btn btn-primary hidden">前往下一關</button>
             </div>
 
             <div class="wrong-area">
@@ -169,11 +171,19 @@
                 <span>已作答</span>
                 <strong id="answeredCount">0</strong>
               </div>
+              <div class="mini-status-item">
+                <span>目前關卡</span>
+                <strong id="currentLevelText">1 / 50</strong>
+              </div>
             </div>
 
             <div class="timer-wrap">
               <span>正計時</span>
               <strong id="timer">00:00</strong>
+            </div>
+
+            <div class="submit-side-wrap">
+              <button id="submitBtn" class="btn btn-accent" disabled>提交試卷</button>
             </div>
           </div>
         </aside>
