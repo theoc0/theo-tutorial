@@ -10,6 +10,7 @@ let started = false;
 let submitted = false;
 let startTime = null;
 let timerInterval = null;
+let lastDirection = "right";
 
 const bankSelect = document.getElementById("bankSelect");
 const bankStatus = document.getElementById("bankStatus");
@@ -40,6 +41,10 @@ const levelUpText = document.getElementById("levelUpText");
 const currentLvEl = document.getElementById("currentLv");
 const bestScoreEl = document.getElementById("bestScore");
 const lastScoreEl = document.getElementById("lastScore");
+const badgeGrid = document.getElementById("badgeGrid");
+
+const starValue = document.getElementById("starValue");
+const starDesc = document.getElementById("starDesc");
 
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
@@ -99,13 +104,6 @@ function saveProgressData(data) {
   localStorage.setItem(getStorageKey(), JSON.stringify(data));
 }
 
-function renderProgressData() {
-  const data = loadProgressData();
-  currentLvEl.textContent = `LV ${data.currentLv || 0}`;
-  bestScoreEl.textContent = data.bestScore || 0;
-  lastScoreEl.textContent = data.lastScore || 0;
-}
-
 function getLevelFromPercentage(percentage) {
   if (percentage >= 90) return 5;
   if (percentage >= 80) return 4;
@@ -113,6 +111,46 @@ function getLevelFromPercentage(percentage) {
   if (percentage >= 60) return 2;
   if (percentage > 0) return 1;
   return 0;
+}
+
+function getStars(percentage) {
+  if (percentage >= 85) {
+    return { stars: "★★★", desc: "表現出色！" };
+  }
+  if (percentage >= 60) {
+    return { stars: "★★☆", desc: "表現不錯，繼續努力！" };
+  }
+  return { stars: "★☆☆", desc: "再接再厲，下次更進一步！" };
+}
+
+function renderBadgeGrid(level) {
+  const badges = [
+    { lv: 1, icon: "🌱", name: "初學萌芽" },
+    { lv: 2, icon: "📘", name: "穩步前行" },
+    { lv: 3, icon: "🧠", name: "語文進階" },
+    { lv: 4, icon: "🏅", name: "高分挑戰" },
+    { lv: 5, icon: "👑", name: "闖關王者" }
+  ];
+
+  badgeGrid.innerHTML = "";
+  badges.forEach(badge => {
+    const div = document.createElement("div");
+    div.className = `badge-item ${level >= badge.lv ? "unlocked" : "locked"}`;
+    div.innerHTML = `
+      <div class="badge-icon">${badge.icon}</div>
+      <div class="badge-name">LV ${badge.lv}<br>${badge.name}</div>
+    `;
+    badgeGrid.appendChild(div);
+  });
+}
+
+function renderProgressData() {
+  const data = loadProgressData();
+  const lv = data.currentLv || 0;
+  currentLvEl.textContent = `LV ${lv}`;
+  bestScoreEl.textContent = data.bestScore || 0;
+  lastScoreEl.textContent = data.lastScore || 0;
+  renderBadgeGrid(lv);
 }
 
 function updateGameLevel(score, total) {
@@ -260,7 +298,22 @@ function updateNavButtons() {
   nextBtn.disabled = !started || currentQuestionIndex >= currentQuestions.length - 1;
 }
 
-function renderSingleQuestion() {
+function askSubmitOnLastQuestion() {
+  setTimeout(() => {
+    const unansweredCount = userAnswers.filter(v => v === null || v === undefined).length;
+    const ok = confirm(
+      unansweredCount === 0
+        ? "你已完成最後一題，是否現在提交試卷？"
+        : `你已到最後一題，目前仍有 ${unansweredCount} 題未作答，是否現在提交試卷？`
+    );
+
+    if (ok) {
+      submitQuiz();
+    }
+  }, 180);
+}
+
+function renderSingleQuestion(direction = "right") {
   singleQuestionWrap.innerHTML = "";
 
   if (!started || !currentQuestions.length) {
@@ -274,7 +327,7 @@ function renderSingleQuestion() {
   const savedAnswer = userAnswers[currentQuestionIndex];
 
   const div = document.createElement("div");
-  div.className = "question-card";
+  div.className = `question-card ${direction === "left" ? "slide-in-left" : "slide-in-right"}`;
   div.innerHTML = `
     <h3>第 ${currentQuestionIndex + 1} 題【${q.cat || ""}｜${q.type || ""}｜難度${q.diff ?? ""}】</h3>
     <p>${q.q || ""}</p>
@@ -304,8 +357,10 @@ function renderSingleQuestion() {
       if (currentQuestionIndex < currentQuestions.length - 1) {
         setTimeout(() => {
           currentQuestionIndex++;
-          renderSingleQuestion();
+          renderSingleQuestion("right");
         }, AUTO_NEXT_DELAY);
+      } else {
+        askSubmitOnLastQuestion();
       }
     });
   });
@@ -339,7 +394,7 @@ function startQuiz() {
   levelUpBox.classList.add("hidden");
   submitBtn.disabled = false;
 
-  renderSingleQuestion();
+  renderSingleQuestion("right");
   startTimer();
 
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -348,13 +403,13 @@ function startQuiz() {
 function goPrev() {
   if (!started || currentQuestionIndex === 0) return;
   currentQuestionIndex--;
-  renderSingleQuestion();
+  renderSingleQuestion("left");
 }
 
 function goNext() {
   if (!started || currentQuestionIndex >= currentQuestions.length - 1) return;
   currentQuestionIndex++;
-  renderSingleQuestion();
+  renderSingleQuestion("right");
 }
 
 function buildResultData() {
@@ -404,6 +459,10 @@ function renderResult(result, levelInfo) {
   document.getElementById("rPaper").textContent = result.paper;
   document.getElementById("rScore").textContent = `${result.score} / ${result.total}（${result.percentage}%）`;
   document.getElementById("rTime").textContent = `${result.timeUsed} 秒`;
+
+  const starInfo = getStars(levelInfo.percentage);
+  starValue.textContent = starInfo.stars;
+  starDesc.textContent = starInfo.desc;
 
   if (levelInfo.newLv > levelInfo.oldLv) {
     levelUpText.textContent = `恭喜升上 LV ${levelInfo.newLv}！`;
