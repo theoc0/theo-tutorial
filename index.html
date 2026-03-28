@@ -12,7 +12,7 @@
       <header class="top-hero">
         <div class="hero-sub">SHAPING INSPIRATION</div>
         <h1>中文闖關遊戲</h1>
-        <p>中國語文練習平台</p>
+        <p>中國語文一題一頁闖關模式</p>
       </header>
 
       <section class="setup-card">
@@ -44,7 +44,7 @@
       </section>
 
       <main class="game-layout">
-        <!-- 左側：通關記錄 -->
+        <!-- 左側 -->
         <aside class="side-panel left-panel">
           <div class="panel-card">
             <h2>通關記錄</h2>
@@ -65,7 +65,7 @@
           </div>
         </aside>
 
-        <!-- 中間：答題區 -->
+        <!-- 中間 -->
         <section class="center-panel">
           <div class="quiz-card">
             <div class="quiz-head">
@@ -75,10 +75,15 @@
               </div>
             </div>
 
-            <div id="questionList" class="question-list">
+            <div id="singleQuestionWrap" class="single-question-wrap">
               <div class="empty-state">
                 請先填寫學生資料並按「開始闖關」。
               </div>
+            </div>
+
+            <div class="nav-row">
+              <button id="prevBtn" class="btn btn-outline" disabled>上一題</button>
+              <button id="nextBtn" class="btn btn-primary" disabled>下一題</button>
             </div>
           </div>
 
@@ -118,10 +123,11 @@
           </div>
         </section>
 
-        <!-- 右側：進度與計時 -->
+        <!-- 右側 -->
         <aside class="side-panel right-panel">
           <div class="panel-card">
             <h2>作答進度</h2>
+
             <div class="progress-wrap">
               <div class="progress-label">
                 <span>本關進度</span>
@@ -129,6 +135,17 @@
               </div>
               <div class="progress-bar">
                 <div id="progressFill" class="progress-fill"></div>
+              </div>
+            </div>
+
+            <div class="mini-status">
+              <div class="mini-status-item">
+                <span>目前題號</span>
+                <strong id="currentQNo">0</strong>
+              </div>
+              <div class="mini-status-item">
+                <span>已作答</span>
+                <strong id="answeredCount">0</strong>
               </div>
             </div>
 
