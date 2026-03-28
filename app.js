@@ -1,4 +1,6 @@
 const BANK_MIN_QUESTIONS = 50;
+const QUESTIONS_PER_RUN = 30;
+const AUTO_NEXT_DELAY = 260;
 
 let currentBankName = "";
 let currentQuestions = [];
@@ -32,6 +34,8 @@ const currentQNo = document.getElementById("currentQNo");
 const answeredCountEl = document.getElementById("answeredCount");
 
 const resultSection = document.getElementById("resultSection");
+const levelUpBox = document.getElementById("levelUpBox");
+const levelUpText = document.getElementById("levelUpText");
 
 const currentLvEl = document.getElementById("currentLv");
 const bestScoreEl = document.getElementById("bestScore");
@@ -39,6 +43,36 @@ const lastScoreEl = document.getElementById("lastScore");
 
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function shuffleArray(arr) {
+  const clone = [...arr];
+  for (let i = clone.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [clone[i], clone[j]] = [clone[j], clone[i]];
+  }
+  return clone;
+}
+
+function sampleQuestions(arr, count) {
+  const shuffled = shuffleArray(arr);
+  return shuffled.slice(0, Math.min(count, shuffled.length));
+}
+
+function shuffleQuestionOptions(question) {
+  const originalOpts = safeArray(question.opts);
+  const optionObjects = originalOpts.map((text, index) => ({
+    text,
+    originalIndex: index
+  }));
+  const shuffledOptions = shuffleArray(optionObjects);
+  const newAns = shuffledOptions.findIndex(item => item.originalIndex === question.ans);
+
+  return {
+    ...question,
+    opts: shuffledOptions.map(item => item.text),
+    ans: newAns
+  };
 }
 
 function getStorageKey() {
@@ -72,21 +106,30 @@ function renderProgressData() {
   lastScoreEl.textContent = data.lastScore || 0;
 }
 
+function getLevelFromPercentage(percentage) {
+  if (percentage >= 90) return 5;
+  if (percentage >= 80) return 4;
+  if (percentage >= 70) return 3;
+  if (percentage >= 60) return 2;
+  if (percentage > 0) return 1;
+  return 0;
+}
+
 function updateGameLevel(score, total) {
   const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
   const data = loadProgressData();
+  const oldLv = data.currentLv || 0;
 
   data.lastScore = percentage;
   if (percentage > (data.bestScore || 0)) data.bestScore = percentage;
 
-  if (percentage >= 90) data.currentLv = Math.max(data.currentLv || 0, 5);
-  else if (percentage >= 80) data.currentLv = Math.max(data.currentLv || 0, 4);
-  else if (percentage >= 70) data.currentLv = Math.max(data.currentLv || 0, 3);
-  else if (percentage >= 60) data.currentLv = Math.max(data.currentLv || 0, 2);
-  else if (percentage > 0) data.currentLv = Math.max(data.currentLv || 0, 1);
+  const newLv = Math.max(oldLv, getLevelFromPercentage(percentage));
+  data.currentLv = newLv;
 
   saveProgressData(data);
   renderProgressData();
+
+  return { oldLv, newLv, percentage };
 }
 
 function getAvailableBanks() {
@@ -140,7 +183,7 @@ function updateBankStatus() {
     bankStatus.textContent = `此題庫題目少於 ${BANK_MIN_QUESTIONS} 題，已禁用。`;
     startBtn.disabled = true;
   } else {
-    bankStatus.textContent = `此題庫可用，共 ${questions.length} 題。`;
+    bankStatus.textContent = `此題庫可用，系統將隨機抽取 ${Math.min(QUESTIONS_PER_RUN, questions.length)} 題。`;
     startBtn.disabled = false;
   }
 }
@@ -242,7 +285,8 @@ function renderSingleQuestion() {
           <span>${String.fromCharCode(65 + i)}. ${opt}</span>
         </label>
       `).join("")}
-    `;
+    </div>
+  `;
   singleQuestionWrap.appendChild(div);
 
   const radios = singleQuestionWrap.querySelectorAll('input[name="single_question"]');
@@ -256,6 +300,13 @@ function renderSingleQuestion() {
       radio.closest(".option").classList.add("selected");
 
       updateProgress();
+
+      if (currentQuestionIndex < currentQuestions.length - 1) {
+        setTimeout(() => {
+          currentQuestionIndex++;
+          renderSingleQuestion();
+        }, AUTO_NEXT_DELAY);
+      }
     });
   });
 
@@ -267,12 +318,14 @@ function startQuiz() {
   if (!validateStudentInfo()) return;
 
   currentBankName = bankSelect.value;
-  currentQuestions = safeArray((QUESTION_BANKS || {})[currentBankName]);
+  const allQuestions = safeArray((QUESTION_BANKS || {})[currentBankName]);
 
-  if (!currentBankName || currentQuestions.length < BANK_MIN_QUESTIONS) {
+  if (!currentBankName || allQuestions.length < BANK_MIN_QUESTIONS) {
     alert("此題庫未啟用或不存在。");
     return;
   }
+
+  currentQuestions = sampleQuestions(allQuestions, QUESTIONS_PER_RUN).map(q => shuffleQuestionOptions(q));
 
   started = true;
   submitted = false;
@@ -283,6 +336,7 @@ function startQuiz() {
   quizMeta.textContent = `共 ${currentQuestions.length} 題｜一題一頁闖關模式`;
 
   resultSection.classList.add("hidden");
+  levelUpBox.classList.add("hidden");
   submitBtn.disabled = false;
 
   renderSingleQuestion();
@@ -343,13 +397,20 @@ function buildResultData() {
   };
 }
 
-function renderResult(result) {
+function renderResult(result, levelInfo) {
   document.getElementById("rName").textContent = result.studentName;
   document.getElementById("rClass").textContent = result.className;
   document.getElementById("rNo").textContent = result.studentNo;
   document.getElementById("rPaper").textContent = result.paper;
   document.getElementById("rScore").textContent = `${result.score} / ${result.total}（${result.percentage}%）`;
   document.getElementById("rTime").textContent = `${result.timeUsed} 秒`;
+
+  if (levelInfo.newLv > levelInfo.oldLv) {
+    levelUpText.textContent = `恭喜升上 LV ${levelInfo.newLv}！`;
+    levelUpBox.classList.remove("hidden");
+  } else {
+    levelUpBox.classList.add("hidden");
+  }
 
   const wrongList = document.getElementById("wrongList");
   wrongList.innerHTML = "";
@@ -400,8 +461,8 @@ function submitQuiz() {
   submitted = true;
   submitBtn.disabled = true;
 
-  renderResult(result);
-  updateGameLevel(result.score, result.total);
+  const levelInfo = updateGameLevel(result.score, result.total);
+  renderResult(result, levelInfo);
 
   window.scrollTo({
     top: resultSection.offsetTop - 12,
@@ -434,6 +495,7 @@ function resetAll() {
   nextBtn.disabled = true;
 
   resultSection.classList.add("hidden");
+  levelUpBox.classList.add("hidden");
 }
 
 bankSelect.addEventListener("change", updateBankStatus);
