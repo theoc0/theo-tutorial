@@ -68,6 +68,9 @@
 
             <div class="badge-title level-score-title">各層分數記錄</div>
             <div id="levelScoreList" class="level-score-list"></div>
+
+            <div class="badge-title map-title">關卡地圖（1–50）</div>
+            <div id="levelMap" class="level-map"></div>
           </div>
         </aside>
 
@@ -97,14 +100,19 @@
 
           <div id="resultSection" class="result-card hidden">
             <div class="result-hero hidden" id="levelUpBox">
-              <div class="level-badge">LV UP!</div>
-              <div class="level-text" id="levelUpText">恭喜升級！</div>
+              <div class="level-badge">LEVEL CLEAR!</div>
+              <div class="level-text" id="levelUpText">恭喜通關！</div>
             </div>
 
             <div class="star-box" id="starBox">
               <div class="star-title">本次星級評價</div>
               <div class="star-value" id="starValue">★★★★★</div>
               <div class="star-desc" id="starDesc">表現出色！</div>
+            </div>
+
+            <div class="clear-condition-box" id="clearConditionBox">
+              <div class="clear-condition-title">通關條件</div>
+              <div class="clear-condition-text" id="clearConditionText">本關必須全對才可通關。</div>
             </div>
 
             <h2>本次結果</h2>
@@ -137,6 +145,7 @@
             </div>
 
             <div class="result-actions">
+              <button id="retryLevelBtn" class="btn btn-outline hidden">重闖本關</button>
               <button id="nextLevelBtn" class="btn btn-primary hidden">前往下一關</button>
             </div>
 
