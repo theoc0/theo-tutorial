@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>中文闖關遊戲</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -44,7 +47,6 @@
       </section>
 
       <main class="game-layout">
-        <!-- 左側 -->
         <aside class="side-panel left-panel">
           <div class="panel-card">
             <h2>通關記錄</h2>
@@ -65,7 +67,6 @@
           </div>
         </aside>
 
-        <!-- 中間 -->
         <section class="center-panel">
           <div class="quiz-card">
             <div class="quiz-head">
@@ -88,7 +89,13 @@
           </div>
 
           <div id="resultSection" class="result-card hidden">
+            <div class="result-hero hidden" id="levelUpBox">
+              <div class="level-badge">LV UP!</div>
+              <div class="level-text" id="levelUpText">恭喜升級！</div>
+            </div>
+
             <h2>本次結果</h2>
+
             <div class="result-grid">
               <div class="result-item">
                 <span>姓名</span>
@@ -123,7 +130,6 @@
           </div>
         </section>
 
-        <!-- 右側 -->
         <aside class="side-panel right-panel">
           <div class="panel-card">
             <h2>作答進度</h2>
