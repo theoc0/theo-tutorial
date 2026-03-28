@@ -193,37 +193,6 @@ body {
   color: var(--primary-dark);
 }
 
-.record-box,
-.progress-wrap,
-.timer-wrap,
-.mini-status {
-  background: var(--soft-blue);
-  border-radius: 18px;
-  padding: 16px;
-}
-
-.record-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px dashed #cfdcf6;
-}
-
-.record-item:last-child {
-  border-bottom: none;
-}
-
-.record-item span {
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.record-item strong {
-  color: var(--primary-dark);
-  font-size: 20px;
-}
-
 .quiz-card {
   padding: 24px;
   min-height: 560px;
@@ -231,6 +200,11 @@ body {
 
 .quiz-head {
   margin-bottom: 16px;
+}
+
+.question-stage {
+  overflow: hidden;
+  min-height: 360px;
 }
 
 .single-question-wrap {
@@ -246,12 +220,103 @@ body {
   font-size: 15px;
 }
 
+.badge-level-box {
+  background: var(--soft-blue);
+  border-radius: 18px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.level-ring {
+  width: 108px;
+  height: 108px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fff7b8 0%, #dff28d 45%, #b9d0ff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 8px #ffffff, 0 8px 18px rgba(60, 108, 212, 0.12);
+}
+
+.level-ring span {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--primary-dark);
+}
+
+.level-summary {
+  display: grid;
+  gap: 10px;
+}
+
+.summary-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.summary-line span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.summary-line strong {
+  color: var(--primary-dark);
+  font-size: 18px;
+}
+
+.badge-title {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.badge-item {
+  border-radius: 18px;
+  padding: 14px 8px;
+  text-align: center;
+  border: 1px solid var(--border);
+  background: #f8fbff;
+  transition: 0.25s ease;
+}
+
+.badge-item.locked {
+  opacity: 0.42;
+  filter: grayscale(0.4);
+}
+
+.badge-item.unlocked {
+  background: linear-gradient(135deg, #fff8bf 0%, #eef9b2 40%, #dce8ff 100%);
+  border-color: #d8e5aa;
+  box-shadow: 0 8px 16px rgba(179, 205, 86, 0.10);
+  transform: translateY(-1px);
+}
+
+.badge-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.badge-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary-dark);
+  line-height: 1.45;
+}
+
 .question-card {
   border: 1px solid var(--border);
   border-radius: 18px;
   background: #fff;
   padding: 20px;
-  animation: fadeSlideIn 0.28s ease;
 }
 
 .question-card h3 {
@@ -312,6 +377,14 @@ body {
   justify-content: space-between;
   gap: 12px;
   margin-top: 20px;
+}
+
+.progress-wrap,
+.timer-wrap,
+.mini-status {
+  background: var(--soft-blue);
+  border-radius: 18px;
+  padding: 16px;
 }
 
 .progress-label {
@@ -420,6 +493,36 @@ body {
   color: var(--primary-dark);
 }
 
+.star-box {
+  background: linear-gradient(135deg, #fff9c8 0%, #f0f8c7 45%, #edf4ff 100%);
+  border-radius: 18px;
+  padding: 18px;
+  text-align: center;
+  margin-bottom: 18px;
+  box-shadow: 0 8px 20px rgba(255, 220, 90, 0.10);
+}
+
+.star-title {
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.star-value {
+  font-size: 32px;
+  letter-spacing: 4px;
+  color: #e3b100;
+  font-weight: 800;
+}
+
+.star-desc {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--primary-dark);
+  font-weight: 700;
+}
+
 .result-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -464,6 +567,14 @@ body {
   line-height: 1.6;
 }
 
+.slide-in-right {
+  animation: slideInRight 0.28s ease;
+}
+
+.slide-in-left {
+  animation: slideInLeft 0.28s ease;
+}
+
 @keyframes fadeSlideIn {
   from {
     opacity: 0;
@@ -486,6 +597,28 @@ body {
   }
   100% {
     transform: scale(1);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(26px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-26px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
