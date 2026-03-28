@@ -1,365 +1,1102 @@
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzx79_-i9JzU_P6pM-daF26m4ByC5-cx3DxczqZH221ozzi5h75x3_1H4nsiwkvPCOU/exec";
-const SUBMIT_TOKEN = "school2026";
-const BANK_MIN_QUESTIONS = 50;
+const TOTAL_LEVELS = 100;
+const QUESTIONS_PER_LEVEL = 30;
+const QUIZ_TIME_SECONDS = 60 * 60;
+const TEACHER_PASSWORD = "teacher2026";
 
-let currentBankName = "";
-let currentQuestions = [];
-let started = false;
-let submitted = false;
-let startTime = null;
-let timerInterval = null;
+let currentLevel = 1;
+let player = "";
+let currentSet = [];
+let answered = false;
+let timer = null;
+let timeLeft = QUIZ_TIME_SECONDS;
 
-const bankSelect = document.getElementById("bankSelect");
-const bankStatus = document.getElementById("bankStatus");
-const startBtn = document.getElementById("startBtn");
-const submitBtn = document.getElementById("submitBtn");
-const resetBtn = document.getElementById("resetBtn");
-const quizSection = document.getElementById("quizSection");
-const resultSection = document.getElementById("resultSection");
-const questionList = document.getElementById("questionList");
-const quizTitle = document.getElementById("quizTitle");
-const quizMeta = document.getElementById("quizMeta");
-const timerEl = document.getElementById("timer");
-
-const studentNameInput = document.getElementById("studentName");
-const classNameInput = document.getElementById("className");
-const studentNoInput = document.getElementById("studentNo");
-
-function safeArray(value) {
-  return Array.isArray(value) ? value : [];
-}
-
+/* =========================
+   題庫管理
+========================= */
 function getAvailableBanks() {
-  if (typeof QUESTION_BANKS !== "object" || !QUESTION_BANKS) return [];
-  return Object.entries(QUESTION_BANKS).map(([name, questions]) => ({
-    name,
-    questions: safeArray(questions),
-    enabled: safeArray(questions).length >= BANK_MIN_QUESTIONS
-  }));
+  return Object.keys(QUESTION_BANKS || {});
 }
 
-function renderBankOptions() {
-  if (!bankSelect) return;
-  bankSelect.innerHTML = "";
+function getCurrentBankName() {
+  return localStorage.getItem("zhCurrentBank") || "中三啟思教科書學生";
+}
+
+function setCurrentBankName(name) {
+  localStorage.setItem("zhCurrentBank", name);
+}
+
+function getCurrentQuestionBank() {
+  return QUESTION_BANKS[getCurrentBankName()] || [];
+}
+
+function initBankSelect() {
+  const sel = document.getElementById("bankSelect");
+  if (!sel) return;
 
   const banks = getAvailableBanks();
+  const current = getCurrentBankName();
+  sel.innerHTML = "";
 
-  if (banks.length === 0) {
-    const option = document.createElement("option");
-    option.textContent = "沒有可用題庫";
-    option.value = "";
-    bankSelect.appendChild(option);
-    startBtn.disabled = true;
-    bankStatus.textContent = "未載入題庫。";
-    return;
-  }
-
-  banks.forEach(bank => {
-    const option = document.createElement("option");
-    option.value = bank.name;
-    option.textContent = `${bank.name}（${bank.questions.length}題）${bank.enabled ? "" : "【未啟用】"}`;
-    option.disabled = !bank.enabled;
-    bankSelect.appendChild(option);
+  banks.forEach(name => {
+    const op = document.createElement("option");
+    op.value = name;
+    op.textContent = name;
+    if (name === current) op.selected = true;
+    sel.appendChild(op);
   });
 
-  const firstEnabled = banks.find(b => b.enabled);
-  if (firstEnabled) bankSelect.value = firstEnabled.name;
-
-  updateBankStatus();
+  updateCurrentBankLabel();
 }
 
-function updateBankStatus() {
-  const bankName = bankSelect.value;
-  const questions = safeArray((QUESTION_BANKS || {})[bankName]);
+function changeQuestionBank() {
+  const sel = document.getElementById("bankSelect");
+  if (!sel) return;
 
-  if (!bankName) {
-    bankStatus.textContent = "未選擇題庫。";
-    startBtn.disabled = true;
+  setCurrentBankName(sel.value);
+  initLevels();
+  renderHistory();
+  updateCurrentBankLabel();
+  renderBankStatus();
+
+  if (isTeacherLoggedIn()) {
+    renderTeacherSummary();
+    populateTeacherStudentSelect();
+    renderTeacherDetail();
+  }
+}
+
+function updateCurrentBankLabel() {
+  const label = document.getElementById("currentBankLabel");
+  const stat = document.getElementById("statBank");
+  const name = getCurrentBankName();
+
+  if (label) label.textContent = `目前題庫：${name}`;
+  if (stat) stat.textContent = name;
+}
+
+/* =========================
+   題庫完整性檢查
+========================= */
+function validateCurrentBank() {
+  const bankName = getCurrentBankName();
+  const bank = getCurrentQuestionBank();
+
+  if (!Array.isArray(bank) || bank.length === 0) {
+    return {
+      ok: false,
+      message: `題庫「${bankName}」沒有任何題目。`
+    };
+  }
+
+  if (bank.length < QUESTIONS_PER_LEVEL) {
+    return {
+      ok: false,
+      message: `題庫「${bankName}」目前只有 ${bank.length} 題，不足 ${QUESTIONS_PER_LEVEL} 題，暫時不能開啟闖關。`
+    };
+  }
+
+  const requiredCats = ["水調歌頭", "孔明借箭", "最苦與最樂", "人間有情", "語文運用"];
+  const requiredTypes = ["體裁", "文言字詞", "閱讀理解"];
+  const requiredLangTypes = ["單元五", "單元六", "單元七"];
+
+  for (const cat of requiredCats) {
+    const hasCat = bank.some(q => q.cat === cat);
+    if (!hasCat) {
+      return {
+        ok: false,
+        message: `題庫「${bankName}」缺少分類：${cat}`
+      };
+    }
+  }
+
+  for (const cat of ["水調歌頭", "孔明借箭", "最苦與最樂", "人間有情"]) {
+    for (const type of requiredTypes) {
+      const hasType = bank.some(q => q.cat === cat && q.type === type);
+      if (!hasType) {
+        return {
+          ok: false,
+          message: `題庫「${bankName}」在「${cat}」中缺少題型：${type}`
+        };
+      }
+    }
+  }
+
+  for (const type of requiredLangTypes) {
+    const hasType = bank.some(q => q.cat === "語文運用" && q.type === type);
+    if (!hasType) {
+      return {
+        ok: false,
+        message: `題庫「${bankName}」缺少語文運用分類：${type}`
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    message: `題庫「${bankName}」可正常使用，共 ${bank.length} 題。`
+  };
+}
+
+function renderBankStatus() {
+  let box = document.getElementById("bankStatus");
+  const startPanel = document.getElementById("startPanel");
+
+  if (!box && startPanel) {
+    box = document.createElement("div");
+    box.id = "bankStatus";
+    box.className = "teacher-status";
+    startPanel.appendChild(box);
+  }
+
+  if (!box) return;
+
+  const result = validateCurrentBank();
+  box.innerHTML = result.ok
+    ? `題庫狀態：<span class="correct">${escapeHtml(result.message)}</span>`
+    : `題庫狀態：<span class="wrong">${escapeHtml(result.message)}</span>`;
+}
+
+/* =========================
+   Storage Keys
+========================= */
+function getUnlockedKey() {
+  return `zhGameUnlocked_${getCurrentBankName()}`;
+}
+function getHistoryKey() {
+  return `zhGameHistory_${getCurrentBankName()}`;
+}
+
+/* =========================
+   教師登入
+========================= */
+function isTeacherLoggedIn() {
+  return sessionStorage.getItem("teacherLoggedIn") === "yes";
+}
+
+function setTeacherLoggedIn(flag) {
+  if (flag) {
+    sessionStorage.setItem("teacherLoggedIn", "yes");
+  } else {
+    sessionStorage.removeItem("teacherLoggedIn");
+  }
+  updateTeacherStatus();
+}
+
+function updateTeacherStatus() {
+  const status = document.getElementById("teacherStatus");
+  if (!status) return;
+  status.textContent = `教師後台狀態：${isTeacherLoggedIn() ? "已登入" : "未登入"}`;
+}
+
+function handleTeacherPanelAccess() {
+  if (isTeacherLoggedIn()) {
+    toggleTeacherPanel(true);
     return;
   }
 
-  if (questions.length < BANK_MIN_QUESTIONS) {
-    bankStatus.textContent = `此題庫題目少於 ${BANK_MIN_QUESTIONS} 題，已禁用。`;
-    startBtn.disabled = true;
+  const pw = prompt("請輸入教師後台密碼：");
+  if (pw === null) return;
+
+  if (pw === TEACHER_PASSWORD) {
+    setTeacherLoggedIn(true);
+    alert("教師登入成功。");
+    toggleTeacherPanel(true);
   } else {
-    bankStatus.textContent = `此題庫可用，共 ${questions.length} 題。`;
-    startBtn.disabled = false;
+    alert("密碼錯誤。");
   }
 }
 
+function teacherLogout() {
+  if (!isTeacherLoggedIn()) {
+    alert("目前未登入教師後台。");
+    return;
+  }
+  setTeacherLoggedIn(false);
+  const panel = document.getElementById("teacherPanel");
+  if (panel) panel.classList.add("hidden-admin");
+  alert("已登出教師後台。");
+}
+
+function toggleTeacherPanel(forceOpen = false) {
+  const panel = document.getElementById("teacherPanel");
+  if (!panel) return;
+
+  if (!isTeacherLoggedIn()) {
+    alert("請先登入教師後台。");
+    return;
+  }
+
+  if (forceOpen) {
+    panel.classList.remove("hidden-admin");
+    renderTeacherSummary();
+    populateTeacherStudentSelect();
+    return;
+  }
+
+  if (panel.classList.contains("hidden-admin")) {
+    panel.classList.remove("hidden-admin");
+    renderTeacherSummary();
+    populateTeacherStudentSelect();
+  } else {
+    panel.classList.add("hidden-admin");
+  }
+}
+
+function showTeacherTab(tab) {
+  if (!isTeacherLoggedIn()) {
+    alert("請先登入教師後台。");
+    return;
+  }
+
+  document.getElementById("teacherSummaryTab").classList.toggle("hidden", tab !== "summary");
+  document.getElementById("teacherDetailTab").classList.toggle("hidden", tab !== "detail");
+  document.getElementById("tabSummaryBtn").classList.toggle("active", tab === "summary");
+  document.getElementById("tabDetailBtn").classList.toggle("active", tab === "detail");
+
+  if (tab === "summary") renderTeacherSummary();
+  if (tab === "detail") {
+    populateTeacherStudentSelect();
+    renderTeacherDetail();
+  }
+}
+
+/* =========================
+   儲存
+========================= */
+function getUnlocked() {
+  return JSON.parse(localStorage.getItem(getUnlockedKey()) || "1");
+}
+
+function setUnlocked(n) {
+  localStorage.setItem(getUnlockedKey(), JSON.stringify(n));
+}
+
+function getHistory() {
+  return JSON.parse(localStorage.getItem(getHistoryKey()) || "[]");
+}
+
+function setHistory(arr) {
+  localStorage.setItem(getHistoryKey(), JSON.stringify(arr));
+}
+
+function addHistory(record) {
+  const history = getHistory();
+  history.unshift(record);
+  setHistory(history.slice(0, 200));
+}
+
+function clearHistory() {
+  if (confirm(`確定要清除題庫「${getCurrentBankName()}」的所有歷史成績紀錄？`)) {
+    localStorage.removeItem(getHistoryKey());
+    renderHistory();
+    if (isTeacherLoggedIn()) {
+      renderTeacherSummary();
+      populateTeacherStudentSelect();
+      renderTeacherDetail();
+    }
+    alert("已清除當前題庫歷史紀錄。");
+  }
+}
+
+function resetProgress() {
+  if (confirm(`確定要重設題庫「${getCurrentBankName()}」的解鎖進度？`)) {
+    setUnlocked(1);
+    initLevels();
+    alert("已重設當前題庫進度為 Lv 1。");
+  }
+}
+
+/* =========================
+   初始化
+========================= */
+document.addEventListener("DOMContentLoaded", () => {
+  initBankSelect();
+  initLevels();
+  renderHistory();
+  updateTeacherStatus();
+  renderBankStatus();
+});
+
+/* =========================
+   初始化等級
+========================= */
+function initLevels() {
+  const sel = document.getElementById("levelSelect");
+  if (!sel) return;
+
+  const unlocked = getUnlocked();
+  sel.innerHTML = "";
+
+  for (let i = 1; i <= TOTAL_LEVELS; i++) {
+    const op = document.createElement("option");
+    op.value = i;
+    op.textContent = `Lv ${i}${i <= unlocked ? "" : "（未解鎖）"}`;
+    if (i > unlocked) op.disabled = true;
+    sel.appendChild(op);
+  }
+
+  sel.value = 1;
+}
+
+/* =========================
+   歷史紀錄
+========================= */
+function renderHistory() {
+  const area = document.getElementById("historyArea");
+  if (!area) return;
+
+  const history = getHistory();
+  if (!history.length) {
+    area.innerHTML = "尚未有紀錄。";
+    return;
+  }
+
+  area.innerHTML = history.slice(0, 15).map((h, i) => `
+    <div style="padding:10px 0;border-bottom:1px solid #334155">
+      <strong>${i + 1}. ${escapeHtml(h.player)}</strong>
+      ｜Lv ${h.level}
+      ｜${h.score}/${h.total}
+      ｜${h.passed ? '<span class="correct">過關</span>' : '<span class="wrong">未過關</span>'}
+      ｜${escapeHtml(h.timeUsed || "")}
+      <br>
+      <span class="small">${escapeHtml(h.date || "")}</span>
+    </div>
+  `).join("");
+}
+
+/* =========================
+   教師總覽
+========================= */
+function renderTeacherSummary() {
+  if (!isTeacherLoggedIn()) return;
+
+  const body = document.getElementById("teacherSummaryBody");
+  if (!body) return;
+
+  const search = (document.getElementById("teacherSearchName")?.value || "").trim().toLowerCase();
+  const filter = document.getElementById("teacherFilterPass")?.value || "all";
+  const history = getHistory();
+
+  let rows = history.filter(h => {
+    const matchName = !search || (h.player || "").toLowerCase().includes(search);
+    const matchPass =
+      filter === "all" ||
+      (filter === "pass" && h.passed) ||
+      (filter === "fail" && !h.passed);
+    return matchName && matchPass;
+  });
+
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="7">沒有符合條件的紀錄。</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = rows.map((h, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${escapeHtml(h.player || "")}</td>
+      <td>Lv ${h.level}</td>
+      <td>${h.score}/${h.total}</td>
+      <td>${h.passed ? '<span class="pill-pass">過關</span>' : '<span class="pill-fail">未過關</span>'}</td>
+      <td>${escapeHtml(h.timeUsed || "")}</td>
+      <td>${escapeHtml(h.date || "")}</td>
+    </tr>
+  `).join("");
+}
+
+function populateTeacherStudentSelect() {
+  if (!isTeacherLoggedIn()) return;
+
+  const sel = document.getElementById("teacherStudentSelect");
+  if (!sel) return;
+
+  const history = getHistory();
+  sel.innerHTML = "";
+
+  if (!history.length) {
+    const op = document.createElement("option");
+    op.value = "";
+    op.textContent = "尚未有學生紀錄";
+    sel.appendChild(op);
+    return;
+  }
+
+  history.forEach((h, i) => {
+    const op = document.createElement("option");
+    op.value = i;
+    op.textContent = `${h.player}｜Lv ${h.level}｜${h.score}/${h.total}｜${h.date}`;
+    sel.appendChild(op);
+  });
+}
+
+function renderTeacherDetail() {
+  if (!isTeacherLoggedIn()) return;
+
+  const area = document.getElementById("teacherDetailArea");
+  const sel = document.getElementById("teacherStudentSelect");
+  if (!area || !sel) return;
+
+  const history = getHistory();
+
+  if (!history.length || sel.value === "") {
+    area.innerHTML = "請先選擇一條學生紀錄。";
+    return;
+  }
+
+  const idx = parseInt(sel.value, 10);
+  const h = history[idx];
+  if (!h) {
+    area.innerHTML = "找不到相關紀錄。";
+    return;
+  }
+
+  let wrongHtml = "";
+  if (h.responses && h.responses.length) {
+    const wrongs = h.responses.filter(r => !r.correct);
+
+    if (!wrongs.length) {
+      wrongHtml = `<div class="teacher-box"><strong>錯題：</strong>本次全部答對或沒有錯題紀錄。</div>`;
+    } else {
+      wrongHtml = wrongs.map((r, i) => `
+        <div class="wrong-q">
+          <strong>錯題 ${i + 1}</strong><br>
+          <strong>課文 / 類型：</strong>${escapeHtml(r.cat || "")} / ${escapeHtml(r.type || "")}<br>
+          <strong>題目：</strong>${escapeHtml(r.question || "")}<br>
+          <strong>學生答案：</strong>${escapeHtml(r.studentAnswer || "未作答")}<br>
+          <strong>正確答案：</strong>${escapeHtml(r.correctAnswer || "")}<br>
+          <strong>解說：</strong>${escapeHtml(r.explanation || "")}
+        </div>
+      `).join("");
+    }
+  } else {
+    wrongHtml = `<div class="teacher-box"><strong>提示：</strong>這筆紀錄沒有逐題作答資料。</div>`;
+  }
+
+  area.innerHTML = `
+    <div class="teacher-meta">
+      <strong>題庫：</strong>${escapeHtml(getCurrentBankName())}<br>
+      <strong>角色名：</strong>${escapeHtml(h.player || "")}<br>
+      <strong>等級：</strong>Lv ${h.level}<br>
+      <strong>得分：</strong>${h.score}/${h.total}<br>
+      <strong>狀態：</strong>${h.passed ? '<span class="pill-pass">過關</span>' : '<span class="pill-fail">未過關</span>'}<br>
+      <strong>作答時間：</strong>${escapeHtml(h.timeUsed || "")}<br>
+      <strong>日期：</strong>${escapeHtml(h.date || "")}
+    </div>
+    <h3>錯題詳情</h3>
+    ${wrongHtml}
+  `;
+}
+
+function printTeacherSummary() {
+  if (!isTeacherLoggedIn()) return;
+
+  const body = document.getElementById("teacherSummaryBody")?.innerHTML || "";
+  const html = `
+    <html>
+    <head>
+      <title>教師成績總覽</title>
+      <style>
+        body{font-family:"Microsoft JhengHei",sans-serif;padding:24px;line-height:1.8}
+        table{width:100%;border-collapse:collapse}
+        th,td{border:1px solid #666;padding:8px;text-align:left}
+        th{background:#eee}
+        @media print { button{display:none} }
+      </style>
+    </head>
+    <body>
+      <h1>教師成績總覽</h1>
+      <div>題庫：${escapeHtml(getCurrentBankName())}</div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>角色名</th><th>等級</th><th>得分</th><th>狀態</th><th>作答時間</th><th>日期</th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+      </table>
+      <button onclick="window.print()">列印 / 另存為 PDF</button>
+    </body>
+    </html>
+  `;
+  const w = window.open("", "_blank");
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+}
+
+function printTeacherDetail() {
+  if (!isTeacherLoggedIn()) return;
+
+  const detail = document.getElementById("teacherDetailArea")?.innerHTML || "";
+  const html = `
+    <html>
+    <head>
+      <title>教師查看學生錯題</title>
+      <style>
+        body{font-family:"Microsoft JhengHei",sans-serif;padding:24px;line-height:1.8}
+        .box{border:1px solid #666;padding:12px;margin:12px 0;border-radius:8px}
+        @media print { button{display:none} }
+      </style>
+    </head>
+    <body>
+      <h1>教師查看學生錯題</h1>
+      <div>題庫：${escapeHtml(getCurrentBankName())}</div>
+      <div class="box">${detail}</div>
+      <button onclick="window.print()">列印 / 另存為 PDF</button>
+    </body>
+    </html>
+  `;
+  const w = window.open("", "_blank");
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+}
+
+/* =========================
+   難度設定
+========================= */
+function getDifficultyProfile(level) {
+  if (level <= 20) return { preferred: [1, 2], fallback: [3], label: "基礎（1-2）" };
+  if (level <= 40) return { preferred: [2, 3], fallback: [1, 4], label: "基礎至中階（2-3）" };
+  if (level <= 60) return { preferred: [3, 4], fallback: [2, 5], label: "中階（3-4）" };
+  if (level <= 80) return { preferred: [4, 5], fallback: [3], label: "中高階（4-5）" };
+  return { preferred: [4, 5], fallback: [3], label: "高階（4-5）" };
+}
+
+/* =========================
+   工具函數
+========================= */
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function questionKey(q) {
+  return `${q.cat}|${q.type}|${q.q}`;
+}
+
+function uniqueQuestions(arr) {
+  const seen = new Set();
+  return arr.filter(q => {
+    const key = questionKey(q);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function filterByDifficulty(pool, preferred, fallback = []) {
+  const p = pool.filter(q => preferred.includes(q.diff));
+  if (p.length > 0) return p;
+  return pool.filter(q => fallback.includes(q.diff));
+}
+
+function takeQuestions(pool, count, usedKeys) {
+  const result = [];
+  for (const q of shuffle(uniqueQuestions(pool))) {
+    const key = questionKey(q);
+    if (!usedKeys.has(key)) {
+      usedKeys.add(key);
+      result.push(q);
+    }
+    if (result.length >= count) break;
+  }
+  return result;
+}
+
+/* =========================
+   題目生成
+========================= */
+function buildQuestionSet(level) {
+  const QUESTION_BANK = getCurrentQuestionBank();
+  const profile = getDifficultyProfile(level);
+  const usedKeys = new Set();
+  let result = [];
+
+  const categoryPlan = [
+    { cat: "水調歌頭", min: 5 },
+    { cat: "孔明借箭", min: 6 },
+    { cat: "最苦與最樂", min: 5 },
+    { cat: "人間有情", min: 5 },
+    { cat: "語文運用", min: 9 }
+  ];
+
+  const requiredTypes = ["體裁", "文言字詞", "閱讀理解"];
+  const languageTypes = ["單元五", "單元六", "單元七"];
+
+  categoryPlan.forEach(item => {
+    const allCat = QUESTION_BANK.filter(q => q.cat === item.cat);
+    const preferredPool = filterByDifficulty(allCat, profile.preferred, profile.fallback);
+
+    let selected = takeQuestions(preferredPool, item.min, usedKeys);
+    if (selected.length < item.min) {
+      selected = selected.concat(takeQuestions(allCat, item.min - selected.length, usedKeys));
+    }
+    result = result.concat(selected);
+  });
+
+  ["水調歌頭", "孔明借箭", "最苦與最樂", "人間有情"].forEach(cat => {
+    requiredTypes.forEach(type => {
+      const exists = result.some(q => q.cat === cat && q.type === type);
+      if (!exists) {
+        const candidates = QUESTION_BANK.filter(q =>
+          q.cat === cat &&
+          q.type === type &&
+          (profile.preferred.includes(q.diff) || profile.fallback.includes(q.diff))
+        );
+        result = result.concat(takeQuestions(candidates, 1, usedKeys));
+      }
+    });
+  });
+
+  languageTypes.forEach(type => {
+    const exists = result.some(q => q.cat === "語文運用" && q.type === type);
+    if (!exists) {
+      const candidates = QUESTION_BANK.filter(q =>
+        q.cat === "語文運用" &&
+        q.type === type &&
+        (profile.preferred.includes(q.diff) || profile.fallback.includes(q.diff))
+      );
+      result = result.concat(takeQuestions(candidates, 1, usedKeys));
+    }
+  });
+
+  if (result.length > QUESTIONS_PER_LEVEL) {
+    result = shuffle(result).slice(0, QUESTIONS_PER_LEVEL);
+  }
+
+  if (result.length < QUESTIONS_PER_LEVEL) {
+    const supplementPool = QUESTION_BANK.filter(q =>
+      profile.preferred.includes(q.diff) || profile.fallback.includes(q.diff)
+    );
+    result = result.concat(
+      takeQuestions(supplementPool, QUESTIONS_PER_LEVEL - result.length, usedKeys)
+    );
+  }
+
+  if (result.length < QUESTIONS_PER_LEVEL) {
+    result = result.concat(
+      takeQuestions(QUESTION_BANK, QUESTIONS_PER_LEVEL - result.length, usedKeys)
+    );
+  }
+
+  return shuffle(result).slice(0, QUESTIONS_PER_LEVEL);
+}
+
+/* =========================
+   計時器
+========================= */
 function formatTime(sec) {
-  const m = String(Math.floor(sec / 60)).padStart(2, "0");
-  const s = String(sec % 60).padStart(2, "0");
-  return `${m}:${s}`;
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 function startTimer() {
   stopTimer();
-  startTime = Date.now();
-  timerEl.textContent = "00:00";
-  timerInterval = setInterval(() => {
-    const used = Math.floor((Date.now() - startTime) / 1000);
-    timerEl.textContent = formatTime(used);
+  timeLeft = QUIZ_TIME_SECONDS;
+  updateTimerDisplay();
+
+  timer = setInterval(() => {
+    timeLeft--;
+    updateTimerDisplay();
+
+    if (timeLeft <= 0) {
+      stopTimer();
+      alert("時間到，系統將自動交卷。");
+      submitLevel(true);
+    }
   }, 1000);
 }
 
 function stopTimer() {
-  if (timerInterval) {
-    clearInterval(timerInterval);
-    timerInterval = null;
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
   }
 }
 
-function validateStudentInfo() {
-  const studentName = studentNameInput?.value.trim() || "";
-  const className = classNameInput?.value.trim() || "";
-  const studentNo = studentNoInput?.value.trim() || "";
+function updateTimerDisplay() {
+  const el = document.getElementById("timerDisplay");
+  if (!el) return;
 
-  if (!studentName || !className || !studentNo) {
-    alert("請先填寫姓名、班別、學號。");
-    return false;
-  }
-  return true;
+  el.textContent = formatTime(timeLeft);
+  if (timeLeft <= 300) el.style.color = "#ef4444";
+  else if (timeLeft <= 900) el.style.color = "#f59e0b";
+  else el.style.color = "";
 }
 
-function renderQuestions() {
-  questionList.innerHTML = "";
-
-  currentQuestions.forEach((q, index) => {
-    const div = document.createElement("div");
-    div.className = "question-card";
-
-    const optsHtml = safeArray(q.opts).map((opt, i) => {
-      const label = String.fromCharCode(65 + i);
-      return `
-        <label class="option">
-          <input type="radio" name="q_${index}" value="${i}">
-          <span>${label}. ${opt}</span>
-        </label>
-      `;
-    }).join("");
-
-    div.innerHTML = `
-      <h3>第 ${index + 1} 題【${q.cat || ""}｜${q.type || ""}｜難度${q.diff ?? ""}】</h3>
-      <p>${q.q || ""}</p>
-      <div class="options">${optsHtml}</div>
-    `;
-
-    questionList.appendChild(div);
-  });
+function getUsedTimeText() {
+  return formatTime(QUIZ_TIME_SECONDS - timeLeft);
 }
 
-function startQuiz() {
-  if (!validateStudentInfo()) return;
-
-  currentBankName = bankSelect.value;
-  currentQuestions = safeArray((QUESTION_BANKS || {})[currentBankName]);
-
-  if (!currentBankName || currentQuestions.length < BANK_MIN_QUESTIONS) {
-    alert("此題庫未啟用或不存在。");
+/* =========================
+   開始遊戲
+========================= */
+function startGame() {
+  const validation = validateCurrentBank();
+  if (!validation.ok) {
+    alert(validation.message);
+    renderBankStatus();
     return;
   }
 
-  started = true;
-  submitted = false;
+  const nameInput = document.getElementById("playerName");
+  const levelSelect = document.getElementById("levelSelect");
 
-  quizSection.classList.remove("hidden");
-  resultSection.classList.add("hidden");
-  submitBtn.disabled = false;
+  const name = nameInput ? nameInput.value.trim() : "";
+  const level = levelSelect ? parseInt(levelSelect.value, 10) : 1;
+  const unlocked = getUnlocked();
 
-  quizTitle.textContent = currentBankName;
-  quizMeta.textContent = `共 ${currentQuestions.length} 題`;
-  renderQuestions();
+  if (!name) {
+    alert("請先輸入角色名。");
+    return;
+  }
+  if (level > unlocked) {
+    alert("此等級尚未解鎖。");
+    return;
+  }
+
+  player = name;
+  currentLevel = level;
+  currentSet = buildQuestionSet(level);
+  answered = false;
+
+  if (!currentSet.length || currentSet.length < QUESTIONS_PER_LEVEL) {
+    alert("題庫題目不足，無法正常開始本關。請更換題庫或補充題目。");
+    return;
+  }
+
+  document.getElementById("startPanel").classList.add("hidden");
+  document.getElementById("gamePanel").classList.remove("hidden");
+
+  const profile = getDifficultyProfile(level);
+
+  document.getElementById("gameTitle").textContent = `${player} 的中文闖關遊戲：Lv ${currentLevel}`;
+  document.getElementById("gameSub").innerHTML =
+    `本關包含 <span class="pill">${currentSet.length} 題</span>　` +
+    `<span class="pill">難度：${profile.label}</span>　` +
+    `<span class="pill">題庫：${escapeHtml(getCurrentBankName())}</span>`;
+
+  document.getElementById("statLevel").textContent = currentLevel;
+  document.getElementById("statCount").textContent = currentSet.length;
+  updateCurrentBankLabel();
+
+  renderQuiz();
+  updateProgress();
+
+  const resultPanel = document.getElementById("resultPanel");
+  resultPanel.classList.add("hidden");
+  resultPanel.innerHTML = "";
+
   startTimer();
-
-  window.scrollTo({ top: quizSection.offsetTop - 10, behavior: "smooth" });
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function collectAnswers() {
-  return currentQuestions.map((q, index) => {
-    const checked = document.querySelector(`input[name="q_${index}"]:checked`);
-    return checked ? Number(checked.value) : null;
+/* =========================
+   返回主頁
+========================= */
+function backHome() {
+  stopTimer();
+  document.getElementById("gamePanel").classList.add("hidden");
+  document.getElementById("startPanel").classList.remove("hidden");
+  initLevels();
+  renderHistory();
+  updateCurrentBankLabel();
+  renderBankStatus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+/* =========================
+   顯示題目
+========================= */
+function renderQuiz() {
+  const area = document.getElementById("quizArea");
+  area.innerHTML = "";
+
+  currentSet.forEach((q, idx) => {
+    const div = document.createElement("div");
+    div.className = "question";
+    div.innerHTML = `
+      <div class="q-meta">第 ${idx + 1} 題 ・ ${q.cat} ・ ${q.type} ・ 難度 ${q.diff}</div>
+      <div class="q-title">${q.q}</div>
+      <div class="options">
+        ${q.opts.map((opt, i) => `
+          <label class="option">
+            <input type="radio" name="q${idx}" value="${i}" onchange="updateProgress()">
+            ${String.fromCharCode(65 + i)}. ${opt}
+          </label>
+        `).join("")}
+      </div>
+      <div id="feedback-${idx}" class="answer-box hidden"></div>
+    `;
+    area.appendChild(div);
   });
 }
 
-function buildResultData() {
-  const studentName = studentNameInput?.value.trim() || "";
-  const className = classNameInput?.value.trim() || "";
-  const studentNo = studentNoInput?.value.trim() || "";
-  const answers = collectAnswers();
+/* =========================
+   進度
+========================= */
+function updateProgress() {
+  const total = currentSet.length;
+  let done = 0;
+  for (let i = 0; i < total; i++) {
+    const checked = document.querySelector(`input[name="q${i}"]:checked`);
+    if (checked) done++;
+  }
+  const progress = document.getElementById("progressBar");
+  if (progress) progress.style.width = `${(done / total) * 100}%`;
+}
+
+/* =========================
+   提交答案
+========================= */
+function submitLevel(autoSubmit = false) {
+  if (answered) return;
+  answered = true;
+  stopTimer();
 
   let score = 0;
-  const wrongQuestions = [];
+  let responseLog = [];
 
-  currentQuestions.forEach((q, i) => {
-    const studentAns = answers[i];
-    const correct = studentAns === q.ans;
+  currentSet.forEach((q, idx) => {
+    const selected = document.querySelector(`input[name="q${idx}"]:checked`);
+    const fb = document.getElementById(`feedback-${idx}`);
 
-    if (correct) {
-      score++;
+    document.querySelectorAll(`input[name="q${idx}"]`).forEach(el => el.disabled = true);
+
+    let studentAnswerText = "未作答";
+    let correct = false;
+
+    if (selected) {
+      const val = parseInt(selected.value, 10);
+      studentAnswerText = `${String.fromCharCode(65 + val)}. ${q.opts[val]}`;
+
+      if (val === q.ans) {
+        score++;
+        correct = true;
+        fb.innerHTML = `
+          <span class="correct">✓ 你答對了</span><br>
+          <strong>正確答案：</strong>${String.fromCharCode(65 + q.ans)}. ${q.opts[q.ans]}<br>
+          <strong>說明：</strong>${q.exp}
+        `;
+      } else {
+        fb.innerHTML = `
+          <span class="wrong">✗ 你答錯了</span><br>
+          <strong>你的答案：</strong>${String.fromCharCode(65 + val)}. ${q.opts[val]}<br>
+          <strong>正確答案：</strong>${String.fromCharCode(65 + q.ans)}. ${q.opts[q.ans]}<br>
+          <strong>說明：</strong>${q.exp}
+        `;
+      }
     } else {
-      wrongQuestions.push({
-        index: i + 1,
-        cat: q.cat || "",
-        type: q.type || "",
-        question: q.q || "",
-        studentAnswer: studentAns === null ? "未作答" : (q.opts?.[studentAns] ?? "未作答"),
-        correctAnswer: q.opts?.[q.ans] ?? "",
-        explanation: q.exp || ""
-      });
+      fb.innerHTML = `
+        <span class="wrong">✗ 你未作答</span><br>
+        <strong>正確答案：</strong>${String.fromCharCode(65 + q.ans)}. ${q.opts[q.ans]}<br>
+        <strong>說明：</strong>${q.exp}
+      `;
     }
+
+    fb.classList.remove("hidden");
+
+    responseLog.push({
+      cat: q.cat,
+      type: q.type,
+      question: q.q,
+      studentAnswer: studentAnswerText,
+      correctAnswer: `${String.fromCharCode(65 + q.ans)}. ${q.opts[q.ans]}`,
+      explanation: q.exp,
+      correct: correct
+    });
   });
 
-  const total = currentQuestions.length;
-  const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
-  const timeUsed = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+  const passLine = Math.ceil(currentSet.length * 0.6);
+  let unlocked = getUnlocked();
+  const passed = score >= passLine;
 
-  return {
-    token: SUBMIT_TOKEN,
-    studentName,
-    className,
-    studentNo,
-    paper: currentBankName,
+  if (passed && currentLevel >= unlocked && currentLevel < TOTAL_LEVELS) {
+    unlocked = currentLevel + 1;
+    setUnlocked(unlocked);
+  }
+
+  addHistory({
+    bank: getCurrentBankName(),
+    player,
+    level: currentLevel,
     score,
-    total,
-    percentage,
-    timeUsed,
-    wrongQuestions,
-    submittedAt: new Date().toISOString()
-  };
-}
+    total: currentSet.length,
+    passed,
+    timeUsed: getUsedTimeText(),
+    date: new Date().toLocaleString("zh-Hant-HK"),
+    responses: responseLog
+  });
 
-function renderResult(result) {
-  const setText = (id, value) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = value;
-  };
+  const rp = document.getElementById("resultPanel");
+  rp.classList.remove("hidden");
+  rp.innerHTML = `
+    <h3>本關結果 ${autoSubmit ? "（時間到自動交卷）" : ""}</h3>
+    <div>題庫：<strong>${escapeHtml(getCurrentBankName())}</strong></div>
+    <div>角色名：<strong>${escapeHtml(player)}</strong></div>
+    <div>等級：<strong>Lv ${currentLevel}</strong></div>
+    <div>得分：<strong>${score} / ${currentSet.length}</strong></div>
+    <div>過關線：<strong>${passLine}</strong></div>
+    <div>作答時間：<strong>${getUsedTimeText()}</strong></div>
+    <div style="margin-top:8px">
+      ${passed
+        ? `<span class="correct">恭喜過關，已解鎖下一關。</span>`
+        : `<span class="wrong">未達過關線，可重玩本關再挑戰。</span>`}
+    </div>
+    <div style="margin-top:10px">
+      <button class="success" onclick="goNextLevel()" ${passed && currentLevel < TOTAL_LEVELS ? "" : "disabled"}>前往下一關</button>
+      <button class="secondary" onclick="startGame()">重玩本關</button>
+      <button class="secondary" onclick="downloadAnswerSheetWithResponses()">下載本關作答PDF內容</button>
+      <button class="secondary" onclick="backHome()">返回主頁</button>
+    </div>
+    <div class="footer">你可向下查看每一題的正確答案與解析。</div>
+  `;
 
-  setText("rName", result.studentName);
-  setText("rClass", result.className);
-  setText("rNo", result.studentNo);
-  setText("rPaper", result.paper);
-  setText("rScore", `${result.score} / ${result.total}（${result.percentage}%）`);
-  setText("rTime", `${result.timeUsed} 秒`);
-
-  const wrongList = document.getElementById("wrongList");
-  if (!wrongList) return;
-
-  wrongList.innerHTML = "";
-
-  if (!result.wrongQuestions.length) {
-    wrongList.innerHTML = `<div class="wrong-item">全對，做得很好！</div>`;
-  } else {
-    result.wrongQuestions.forEach(item => {
-      const div = document.createElement("div");
-      div.className = "wrong-item";
-      div.innerHTML = `
-        <strong>第 ${item.index} 題【${item.cat}｜${item.type}】</strong>
-        <p>${item.question}</p>
-        <p><strong>你的答案：</strong>${item.studentAnswer}</p>
-        <p><strong>正確答案：</strong>${item.correctAnswer}</p>
-        <p><strong>解說：</strong>${item.explanation}</p>
-      `;
-      wrongList.appendChild(div);
-    });
+  initLevels();
+  renderHistory();
+  if (isTeacherLoggedIn()) {
+    renderTeacherSummary();
+    populateTeacherStudentSelect();
   }
-
-  resultSection.classList.remove("hidden");
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-async function submitResultToCloud(resultData) {
-  try {
-    const response = await fetch(APPS_SCRIPT_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8"
-      },
-      body: JSON.stringify(resultData)
-    });
-
-    const text = await response.text();
-
-    try {
-      return JSON.parse(text);
-    } catch {
-      return { status: "unknown", raw: text };
-    }
-  } catch (error) {
-    console.error("提交失敗：", error);
-    return { status: "error", message: error.message };
+/* =========================
+   下一關
+========================= */
+function goNextLevel() {
+  const unlocked = getUnlocked();
+  if (currentLevel + 1 <= unlocked) {
+    document.getElementById("levelSelect").value = currentLevel + 1;
+    document.getElementById("startPanel").classList.remove("hidden");
+    document.getElementById("gamePanel").classList.add("hidden");
+    startGame();
   }
 }
 
-async function submitQuiz() {
-  if (!started) {
-    alert("請先開始作答。");
+/* =========================
+   PDF / 列印
+========================= */
+function openPrintWindow(html) {
+  const w = window.open("", "_blank");
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+}
+
+function basePrintCSS() {
+  return `
+    <style>
+      body{font-family:"Microsoft JhengHei",sans-serif;color:#000;padding:28px;line-height:1.8}
+      h1,h2,h3{margin:0 0 10px}
+      .meta{margin-bottom:16px}
+      .q{margin:16px 0;padding:12px;border:1px solid #999;border-radius:8px}
+      .opt{margin-left:18px}
+      .space{height:26px;border-bottom:1px dashed #aaa;margin-top:8px}
+      .small{font-size:12px;color:#444}
+      @media print { button{display:none} }
+    </style>
+  `;
+}
+
+function downloadBlankPDFLike() {
+  const validation = validateCurrentBank();
+  if (!validation.ok) {
+    alert(validation.message);
     return;
   }
 
-  if (submitted) {
-    alert("你已提交過成績。");
-    return;
-  }
+  const nameInput = document.getElementById("playerName");
+  const levelSelect = document.getElementById("levelSelect");
 
-  stopTimer();
+  const name = (nameInput && nameInput.value.trim()) || player || "________________";
+  const level = (levelSelect && parseInt(levelSelect.value, 10)) || currentLevel || 1;
+  const set = buildQuestionSet(level);
 
-  const unansweredCount = collectAnswers().filter(v => v === null).length;
-  if (unansweredCount > 0) {
-    const ok = confirm(`你仍有 ${unansweredCount} 題未作答，是否仍要提交？`);
-    if (!ok) {
-      startTimerResume();
-      return;
-    }
-  }
-
-  const result = buildResultData();
-  renderResult(result);
-
-  submitBtn.disabled = true;
-  submitted = true;
-
-  const response = await submitResultToCloud(result);
-
-  if (response.status === "success" || response.status === "success_raw" || response.status === "unknown") {
-    alert("成績已成功提交到雲端。");
-  } else {
-    alert(`成績已計算，但雲端提交失敗：${response.message || "未知錯誤"}`);
-  }
-
-  window.scrollTo({ top: resultSection.offsetTop - 10, behavior: "smooth" });
+  const html = `
+    <html>
+      <head>
+        <title>學生作答紙</title>
+        ${basePrintCSS()}
+      </head>
+      <body>
+        <h1>中文闖關遊戲 — 學生作答紙</h1>
+        <div class="meta">
+          題庫：${escapeHtml(getCurrentBankName())}<br>
+          角色名：${escapeHtml(name)}<br>
+          等級：Lv ${level}<br>
+          題數：${set.length}<br>
+          建議時間：60分鐘
+        </div>
+        ${set.map((q, idx) => `
+          <div class="q">
+            <strong>第 ${idx + 1} 題</strong>（${q.cat}｜${q.type}）<br>
+            ${escapeHtml(q.q)}
+            ${q.opts.map((o, i) => `<div class="opt">${String.fromCharCode(65 + i)}. ${escapeHtml(o)}</div>`).join("")}
+            <div class="space"></div>
+          </div>
+        `).join("")}
+        <div class="small">請在瀏覽器中選擇「列印」→「另存為 PDF」。</div>
+        <button onclick="window.print()">列印 / 另存為 PDF</button>
+      </body>
+    </html>
+  `;
+  openPrintWindow(html);
 }
 
-function startTimerResume() {
-  if (!startTime) {
-    startTimer();
-    return;
-  }
-  const elapsed = Math.floor((Date.now() - startTime) / 1000);
-  stopTimer();
-  const resumedBase = Date.now() - elapsed * 1000;
-  startTime = resumedBase;
-  timerInterval = setInterval(() => {
-    const used = Math.floor((Date.now() - startTime) / 1000);
-    timerEl.textContent = formatTime(used);
-  }, 1000);
+function downloadAnswerSheetWithResponses() {
+  if (!currentSet.length) return;
+
+  const html = `
+    <html>
+      <head>
+        <title>本關作答與答案</title>
+        ${basePrintCSS()}
+      </head>
+      <body>
+        <h1>中文闖關遊戲 — 本關作答與答案</h1>
+        <div class="meta">
+          題庫：${escapeHtml(getCurrentBankName())}<br>
+          角色名：${escapeHtml(player)}<br>
+          等級：Lv ${currentLevel}<br>
+          題數：${currentSet.length}<br>
+          作答時間：${getUsedTimeText()}
+        </div>
+        ${currentSet.map((q, idx) => {
+          const selected = document.querySelector(`input[name="q${idx}"]:checked`);
+          const val = selected ? parseInt(selected.value, 10) : null;
+          return `
+            <div class="q">
+              <strong>第 ${idx + 1} 題</strong>（${q.cat}｜${q.type}）<br>
+              ${escapeHtml(q.q)}
+              ${q.opts.map((o, i) => `<div class="opt">${String.fromCharCode(65 + i)}. ${escapeHtml(o)}</div>`).join("")}
+              <div><strong>你的答案：</strong>${val === null ? "未作答" : `${String.fromCharCode(65 + val)}. ${escapeHtml(q.opts[val])}`}</div>
+              <div><strong>正確答案：</strong>${String.fromCharCode(65 + q.ans)}. ${escapeHtml(q.opts[q.ans])}</div>
+              <div><strong>說明：</strong>${escapeHtml(q.exp)}</div>
+            </div>
+          `;
+        }).join("")}
+        <div class="small">請在瀏覽器中選擇「列印」→「另存為 PDF」。</div>
+        <button onclick="window.print()">列印 / 另存為 PDF</button>
+      </body>
+    </html>
+  `;
+  openPrintWindow(html);
 }
 
-function resetAll() {
-  stopTimer();
-  started = false;
-  submitted = false;
-  currentBankName = "";
-  currentQuestions = [];
-  questionList.innerHTML = "";
-  quizSection.classList.add("hidden");
-  resultSection.classList.add("hidden");
-  submitBtn.disabled = true;
-  timerEl.textContent = "00:00";
+/* =========================
+   HTML安全
+========================= */
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
-
-if (bankSelect) bankSelect.addEventListener("change", updateBankStatus);
-if (startBtn) startBtn.addEventListener("click", startQuiz);
-if (submitBtn) submitBtn.addEventListener("click", submitQuiz);
-if (resetBtn) resetBtn.addEventListener("click", resetAll);
-
-renderBankOptions();
