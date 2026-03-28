@@ -1,260 +1,84 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-HK">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>中文闖關遊戲</title>
-  <meta name="description" content="中文闖關遊戲，支援多題庫切換、教師後台、錯題分析、倒數計時與 PDF 列印。" />
   <link rel="stylesheet" href="style.css" />
-  <style>
-    .admin-tools {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-    .admin-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
-    .admin-table th,
-    .admin-table td {
-      border: 1px solid #334155;
-      padding: 10px;
-      vertical-align: top;
-      text-align: left;
-    }
-    .admin-table th {
-      background: #0f172a;
-      color: #e2e8f0;
-    }
-    .admin-table td {
-      background: #111827;
-      color: #e5e7eb;
-    }
-    .admin-scroll {
-      overflow-x: auto;
-    }
-    .teacher-box {
-      margin-top: 16px;
-      padding: 14px;
-      border: 1px solid #334155;
-      border-radius: 12px;
-      background: #0b1220;
-    }
-    .teacher-meta {
-      margin-bottom: 10px;
-      line-height: 1.8;
-    }
-    .wrong-q {
-      border: 1px solid #334155;
-      border-radius: 10px;
-      padding: 10px;
-      margin-top: 10px;
-      background: #111827;
-    }
-    .hidden-admin {
-      display: none;
-    }
-    .tab-buttons {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-    .tab-buttons button.active {
-      outline: 2px solid #38bdf8;
-    }
-    .pill-pass {
-      color: #4ade80;
-      font-weight: bold;
-    }
-    .pill-fail {
-      color: #f87171;
-      font-weight: bold;
-    }
-    .teacher-status {
-      margin-top: 10px;
-      font-size: 14px;
-      color: #94a3b8;
-    }
-    .bank-label {
-      margin-top: 8px;
-      color: #cbd5e1;
-      font-size: 14px;
-    }
-    .bank-status-box {
-      margin-top: 12px;
-      padding: 12px 14px;
-      border-radius: 12px;
-      border: 1px solid #334155;
-      background: #0b1220;
-      font-size: 14px;
-      line-height: 1.8;
-    }
-    .bank-help {
-      margin-top: 8px;
-      font-size: 13px;
-      color: #94a3b8;
-    }
-  </style>
 </head>
 <body>
-  <div class="wrap">
-
-    <!-- 首頁 -->
-    <div class="panel" id="startPanel">
+  <div class="container">
+    <header class="topbar">
       <h1>中文闖關遊戲</h1>
-      <p class="sub">
-        本遊戲支援多題庫切換、闖關模式、教師後台、成績分析與錯題紀錄。<br>
-        每關約 30 題，全為選擇題，建議於 1 小時內完成。
-      </p>
-
-      <div class="row mt">
-        <div class="col">
-          <label>選擇題庫</label>
-          <select id="bankSelect" onchange="changeQuestionBank()"></select>
-          <div class="bank-label" id="currentBankLabel">目前題庫：--</div>
-          <div class="bank-help">
-            請先選擇題庫，再輸入角色名與等級。
-          </div>
-        </div>
-        <div class="col">
-          <label>角色名</label>
-          <input type="text" id="playerName" placeholder="請輸入你的角色名，例如：小狀元" />
-        </div>
-        <div class="col">
-          <label>選擇等級</label>
-          <select id="levelSelect"></select>
-        </div>
+      <div class="top-links">
+        <a href="teacher.html" class="btn ghost">教師後台</a>
       </div>
+    </header>
 
-      <!-- 題庫狀態提示 -->
-      <div id="bankStatus" class="bank-status-box">
-        題庫狀態：檢查中……
-      </div>
-
-      <div class="row mt">
-        <button onclick="startGame()">開始遊戲</button>
-        <button class="secondary" onclick="downloadBlankPDFLike()">下載學生作答PDF內容（列印版）</button>
-        <button class="secondary" onclick="resetProgress()">重設當前題庫解鎖進度</button>
-        <button class="secondary" onclick="handleTeacherPanelAccess()">教師後台</button>
-        <button class="secondary" onclick="teacherLogout()">教師登出</button>
-      </div>
-
-      <div class="teacher-status" id="teacherStatus">
-        教師後台狀態：未登入
-      </div>
-
-      <div class="footer">
-        說明：<br>
-        1. 請先選擇題庫，再輸入角色名及選擇等級。<br>
-        2. 不同題庫的進度與歷史紀錄會分開儲存。<br>
-        3. 每關 30 題，倒數 60 分鐘，時間到自動交卷。<br>
-        4. 若題庫狀態顯示不可用，請更換題庫。<br>
-        5. 教師後台已加入密碼保護。
-      </div>
-    </div>
-
-    <!-- 歷史紀錄 -->
-    <div class="panel" id="historyPanel">
-      <h2>歷史成績紀錄（當前題庫）</h2>
-      <div id="historyArea" class="small">尚未有紀錄。</div>
-      <div style="margin-top:12px">
-        <button class="secondary" onclick="clearHistory()">清除當前題庫歷史紀錄</button>
-      </div>
-    </div>
-
-    <!-- 教師後台 -->
-    <div class="panel hidden-admin" id="teacherPanel">
-      <h2>教師後台（當前題庫）</h2>
-      <p class="sub">
-        可查閱當前題庫的學生歷史成績、過關情況及錯題紀錄。<br>
-        資料按題庫分開儲存。
-      </p>
-
-      <div class="tab-buttons">
-        <button id="tabSummaryBtn" class="active" onclick="showTeacherTab('summary')">成績總覽</button>
-        <button id="tabDetailBtn" onclick="showTeacherTab('detail')">學生詳情 / 錯題</button>
-      </div>
-
-      <div id="teacherSummaryTab">
-        <div class="admin-tools">
-          <input type="text" id="teacherSearchName" placeholder="搜尋角色名" style="max-width:220px;">
-          <select id="teacherFilterPass" style="max-width:180px;">
-            <option value="all">全部狀態</option>
-            <option value="pass">只看過關</option>
-            <option value="fail">只看未過關</option>
-          </select>
-          <button onclick="renderTeacherSummary()">搜尋 / 篩選</button>
-          <button class="secondary" onclick="printTeacherSummary()">列印 / 另存為 PDF</button>
-        </div>
-
-        <div class="admin-scroll">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>角色名</th>
-                <th>等級</th>
-                <th>得分</th>
-                <th>狀態</th>
-                <th>作答時間</th>
-                <th>日期</th>
-              </tr>
-            </thead>
-            <tbody id="teacherSummaryBody">
-              <tr><td colspan="7">尚未有紀錄。</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div id="teacherDetailTab" class="hidden">
-        <div class="admin-tools">
-          <select id="teacherStudentSelect" style="min-width:280px;"></select>
-          <button onclick="renderTeacherDetail()">查看紀錄詳情</button>
-          <button class="secondary" onclick="printTeacherDetail()">列印 / 另存為 PDF</button>
-        </div>
-        <div id="teacherDetailArea" class="teacher-box">
-          請先選擇一條學生紀錄。
-        </div>
-      </div>
-    </div>
-
-    <!-- 遊戲頁 -->
-    <div class="panel hidden" id="gamePanel">
-      <div class="topbar">
+    <section class="card">
+      <h2>學生資料</h2>
+      <div class="grid-3">
         <div>
-          <h2 id="gameTitle">闖關中</h2>
-          <div class="small" id="gameSub"></div>
+          <label>姓名</label>
+          <input id="studentName" type="text" placeholder="例如：陳大文" />
         </div>
-        <div class="row">
-          <div class="stat"><div class="k">題庫</div><div class="v" id="statBank" style="font-size:14px;">--</div></div>
-          <div class="stat"><div class="k">等級</div><div class="v" id="statLevel">1</div></div>
-          <div class="stat"><div class="k">題目</div><div class="v" id="statCount">30</div></div>
-          <div class="stat"><div class="k">建議時間</div><div class="v">60分</div></div>
-          <div class="stat" id="timerBox"><div class="k">剩餘時間</div><div class="v" id="timerDisplay">60:00</div></div>
+        <div>
+          <label>班別</label>
+          <input id="className" type="text" placeholder="例如：6A" />
+        </div>
+        <div>
+          <label>學號</label>
+          <input id="studentNo" type="text" placeholder="例如：12" />
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>選擇題庫</h2>
+      <div class="grid-2">
+        <div>
+          <label>題庫</label>
+          <select id="bankSelect"></select>
+          <small id="bankStatus" class="muted"></small>
+        </div>
+        <div class="actions">
+          <button id="startBtn" class="btn">開始作答</button>
+          <button id="submitBtn" class="btn success" disabled>提交成績</button>
+          <button id="resetBtn" class="btn danger">重設</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="quizSection" class="card hidden">
+      <div class="quiz-head">
+        <div>
+          <h2 id="quizTitle">試卷</h2>
+          <p id="quizMeta" class="muted"></p>
+        </div>
+        <div class="timer-box">
+          <span>作答時間</span>
+          <strong id="timer">00:00</strong>
         </div>
       </div>
 
-      <div class="mt">
-        <div class="small">完成進度</div>
-        <div class="progress"><div id="progressBar"></div></div>
+      <div id="questionList"></div>
+    </section>
+
+    <section id="resultSection" class="card hidden">
+      <h2>作答結果</h2>
+      <div class="result-grid">
+        <div class="result-item"><span>姓名</span><strong id="rName">-</strong></div>
+        <div class="result-item"><span>班別</span><strong id="rClass">-</strong></div>
+        <div class="result-item"><span>學號</span><strong id="rNo">-</strong></div>
+        <div class="result-item"><span>題庫</span><strong id="rPaper">-</strong></div>
+        <div class="result-item"><span>分數</span><strong id="rScore">-</strong></div>
+        <div class="result-item"><span>時間</span><strong id="rTime">-</strong></div>
       </div>
-
-      <div id="quizArea"></div>
-
-      <div class="row mt">
-        <button class="success" onclick="submitLevel()">提交答案</button>
-        <button class="secondary" onclick="backHome()">返回主頁</button>
-        <button class="secondary" onclick="downloadBlankPDFLike()">下載本關作答PDF內容</button>
+      <div>
+        <h3>錯題</h3>
+        <div id="wrongList" class="wrong-list"></div>
       </div>
-
-      <div id="resultPanel" class="summary hidden"></div>
-    </div>
-
+    </section>
   </div>
 
   <script src="question-banks.js"></script>
