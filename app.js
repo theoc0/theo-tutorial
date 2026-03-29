@@ -79,7 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!els.bankSelect) return;
     els.bankSelect.innerHTML = "";
 
-    if (typeof QUESTION_BANKS === "undefined" || !Array.isArray(QUESTION_BANKS)) {
+    if (typeof QUESTION_BANKS === "undefined" || !Array.isArray(QUESTION_BANKS) || !QUESTION_BANKS.length) {
       const opt = document.createElement("option");
       opt.value = "";
       opt.textContent = "未找到題庫";
@@ -116,13 +116,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!name) {
       alert("請先輸入姓名。");
-      if (els.studentName) els.studentName.focus();
       return null;
     }
 
     if (!bank) {
       alert("請先選擇題庫。");
-      if (els.bankSelect) els.bankSelect.focus();
       return null;
     }
 
@@ -219,10 +217,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!q) return;
 
     if (els.questionText) {
-      els.questionText.classList.remove("fade-in");
-      void els.questionText.offsetWidth;
       els.questionText.textContent = q.q;
-      els.questionText.classList.add("fade-in");
     }
 
     if (els.optionsWrap) {
@@ -244,13 +239,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function selectAnswer(idx) {
     state.answers[state.currentIndex] = idx;
     renderQuestion();
-
-    setTimeout(() => {
-      if (state.currentIndex < state.currentQuestions.length - 1) {
-        state.currentIndex++;
-        renderQuestion();
-      }
-    }, 220);
   }
 
   function goPrevQuestion() {
@@ -310,12 +298,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function submitQuiz() {
     if (!state.currentQuestions.length) return;
-
-    const unanswered = state.answers.map((a, i) => (a === null ? i + 1 : null)).filter(Boolean);
-    if (unanswered.length) {
-      const go = confirm(`尚有 ${unanswered.length} 題未作答，是否仍要交卷？`);
-      if (!go) return;
-    }
 
     stopTimer();
 
@@ -499,8 +481,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function resetAllData() {
-    const ok = confirm("確定清除本機所有通關記錄？");
-    if (!ok) return;
     localStorage.removeItem(STORAGE_KEY);
     state.records = {};
     renderStartPanel();
