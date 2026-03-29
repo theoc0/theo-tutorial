@@ -79,7 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!els.bankSelect) return;
     els.bankSelect.innerHTML = "";
 
-    if (typeof QUESTION_BANKS === "undefined" || !Array.isArray(QUESTION_BANKS) || !QUESTION_BANKS.length) {
+    if (typeof QUESTION_BANKS === "undefined" || !Array.isArray(QUESTION_BANKS) || QUESTION_BANKS.length === 0) {
       const opt = document.createElement("option");
       opt.value = "";
       opt.textContent = "未找到題庫";
@@ -90,14 +90,17 @@ document.addEventListener("DOMContentLoaded", () => {
     QUESTION_BANKS.forEach((bank, i) => {
       const opt = document.createElement("option");
       const available = isBankAvailable(bank);
+
       opt.value = bank.name;
       opt.textContent = available ? bank.name : `${bank.name}（未開放）`;
       opt.disabled = !available;
+      opt.dataset.available = available ? "1" : "0";
+
       if (i === 0 && available) opt.selected = true;
       els.bankSelect.appendChild(opt);
     });
 
-    const firstAvailable = [...els.bankSelect.options].find(o => !o.disabled);
+    const firstAvailable = [...els.bankSelect.options].find(opt => !opt.disabled);
     if (firstAvailable) firstAvailable.selected = true;
   }
 
@@ -106,7 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function getBankByName(name) {
-    if (!Array.isArray(QUESTION_BANKS)) return null;
+    if (typeof QUESTION_BANKS === "undefined" || !Array.isArray(QUESTION_BANKS)) return null;
     return QUESTION_BANKS.find(b => b.name === name) || null;
   }
 
@@ -116,16 +119,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!name) {
       alert("請先輸入姓名。");
+      if (els.studentName) els.studentName.focus();
       return null;
     }
 
     if (!bank) {
       alert("請先選擇題庫。");
+      if (els.bankSelect) els.bankSelect.focus();
       return null;
     }
 
     const bankObj = getBankByName(bank);
-    if (!bankObj || !isBankAvailable(bankObj)) {
+    if (!bankObj) {
+      alert("找不到所選題庫。");
+      return null;
+    }
+
+    if (!isBankAvailable(bankObj)) {
       alert("此題庫題目不足 30 題，暫未開放。");
       return null;
     }
@@ -205,6 +215,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function shuffleQuestionOptions(q) {
     const newQ = JSON.parse(JSON.stringify(q));
+
+    if (!Array.isArray(newQ.opts)) {
+      newQ.opts = [];
+      newQ.ans = null;
+      return newQ;
+    }
+
     const indexed = newQ.opts.map((opt, idx) => ({ opt, idx }));
     shuffleArray(indexed);
     newQ.opts = indexed.map(x => x.opt);
@@ -217,19 +234,29 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!q) return;
 
     if (els.questionText) {
-      els.questionText.textContent = q.q;
+      els.questionText.classList.remove("fade-in");
+      void els.questionText.offsetWidth;
+      els.questionText.textContent = q.q || "題目讀取失敗";
+      els.questionText.classList.add("fade-in");
     }
 
     if (els.optionsWrap) {
       els.optionsWrap.innerHTML = "";
-      q.opts.forEach((opt, idx) => {
-        const btn = document.createElement("button");
-        btn.className = "option-btn";
-        if (state.answers[state.currentIndex] === idx) btn.classList.add("selected");
-        btn.innerHTML = `<span class="option-label">${String.fromCharCode(65 + idx)}.</span> ${opt}`;
-        btn.addEventListener("click", () => selectAnswer(idx));
-        els.optionsWrap.appendChild(btn);
-      });
+
+      if (!Array.isArray(q.opts) || q.opts.length === 0) {
+        const div = document.createElement("div");
+        div.textContent = "本題選項讀取失敗";
+        els.optionsWrap.appendChild(div);
+      } else {
+        q.opts.forEach((opt, idx) => {
+          const btn = document.createElement("button");
+          btn.className = "option-btn";
+          if (state.answers[state.currentIndex] === idx) btn.classList.add("selected");
+          btn.innerHTML = `<span class="option-label">${String.fromCharCode(65 + idx)}.</span> ${opt}`;
+          btn.addEventListener("click", () => selectAnswer(idx));
+          els.optionsWrap.appendChild(btn);
+        });
+      }
     }
 
     updateRightPanel();
@@ -239,6 +266,13 @@ document.addEventListener("DOMContentLoaded", () => {
   function selectAnswer(idx) {
     state.answers[state.currentIndex] = idx;
     renderQuestion();
+
+    setTimeout(() => {
+      if (state.currentIndex < state.currentQuestions.length - 1) {
+        state.currentIndex++;
+        renderQuestion();
+      }
+    }, 220);
   }
 
   function goPrevQuestion() {
@@ -299,6 +333,12 @@ document.addEventListener("DOMContentLoaded", () => {
   function submitQuiz() {
     if (!state.currentQuestions.length) return;
 
+    const unanswered = state.answers.map((a, i) => (a === null ? i + 1 : null)).filter(Boolean);
+    if (unanswered.length) {
+      const go = confirm(`尚有 ${unanswered.length} 題未作答，是否仍要交卷？`);
+      if (!go) return;
+    }
+
     stopTimer();
 
     let correct = 0;
@@ -345,10 +385,12 @@ document.addEventListener("DOMContentLoaded", () => {
   function goNextLevel() {
     const next = clampLevel(state.currentLevel + 1);
     prepareLevel(next);
+
     if (!state.currentQuestions.length) {
       alert("下一關目前沒有足夠題目。");
       return;
     }
+
     switchScreen("quiz");
     startTimer();
     renderQuestion();
@@ -357,10 +399,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function retryLevel() {
     prepareLevel(state.currentLevel);
+
     if (!state.currentQuestions.length) {
       alert("本關目前沒有足夠題目。");
       return;
     }
+
     switchScreen("quiz");
     startTimer();
     renderQuestion();
@@ -411,7 +455,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const bankObj = getBankByName(bank);
     if (!bankObj || !isBankAvailable(bankObj)) {
-      if (els.playerDisplay) els.playerDisplay.textContent = name;
+      if (els.playerDisplay) els.playerDisplay.textContent = name || "-";
       if (els.levelDisplay) els.levelDisplay.textContent = "未開放";
       if (els.highestScoreDisplay) els.highestScoreDisplay.textContent = "0";
       if (els.latestScoreDisplay) els.latestScoreDisplay.textContent = "0";
@@ -481,6 +525,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function resetAllData() {
+    const ok = confirm("確定清除本機所有通關記錄？");
+    if (!ok) return;
     localStorage.removeItem(STORAGE_KEY);
     state.records = {};
     renderStartPanel();
@@ -506,7 +552,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function loadRecords() {
     try {
       return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-    } catch {
+    } catch (e) {
       return {};
     }
   }
@@ -526,4 +572,3 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 });
- 
