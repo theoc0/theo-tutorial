@@ -12,6 +12,8 @@
 // resultTitle, scoreText, starText, resultMessage
 
 const STORAGE_KEY = "cn_game_records_v3";
+const QUESTIONS_PER_LEVEL = 30;
+const MIN_BANK_QUESTIONS = 30;
 
 document.addEventListener("DOMContentLoaded", () => {
   const els = {
@@ -97,11 +99,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
     QUESTION_BANKS.forEach((bank, i) => {
       const opt = document.createElement("option");
+      const total = Array.isArray(bank.questions) ? bank.questions.length : 0;
+      const available = isBankAvailable(bank);
+
       opt.value = bank.name;
-      opt.textContent = bank.name;
-      if (i === 0) opt.selected = true;
+      opt.textContent = available
+        ? bank.name
+        : `${bank.name}（未開放）`;
+
+      opt.dataset.available = available ? "1" : "0";
+
+      if (!available) {
+        opt.disabled = true;
+      }
+
+      if (i === 0 && available) {
+        opt.selected = true;
+      }
+
       els.bankSelect.appendChild(opt);
     });
+
+    // 若第一個剛好是 disabled，改選第一個可用題庫
+    const firstAvailable = [...els.bankSelect.options].find(opt => !opt.disabled);
+    if (firstAvailable) {
+      firstAvailable.selected = true;
+    }
+  }
+
+  function isBankAvailable(bank) {
+    return Array.isArray(bank?.questions) && bank.questions.length >= MIN_BANK_QUESTIONS;
+  }
+
+  function getBankByName(name) {
+    if (typeof QUESTION_BANKS === "undefined" || !Array.isArray(QUESTION_BANKS)) return null;
+    return QUESTION_BANKS.find(b => b.name === name) || null;
   }
 
   function validateStudentInfo() {
@@ -120,6 +152,18 @@ document.addEventListener("DOMContentLoaded", () => {
       return null;
     }
 
+    const bankObj = getBankByName(bank);
+    if (!bankObj) {
+      alert("找不到所選題庫。");
+      return null;
+    }
+
+    if (!isBankAvailable(bankObj)) {
+      alert("此題庫題目不足 30 題，暫未開放。");
+      if (els.bankSelect) els.bankSelect.focus();
+      return null;
+    }
+
     return { name, bank };
   }
 
@@ -134,6 +178,12 @@ document.addEventListener("DOMContentLoaded", () => {
     state.currentLevel = clampLevel((playerData.clearedLevels || 0) + 1);
 
     prepareLevel(state.currentLevel);
+
+    if (!state.currentQuestions.length) {
+      alert("此題庫目前沒有足夠題目開始本關。");
+      return;
+    }
+
     updateLeftPanel();
     switchScreen("quiz");
     startTimer();
@@ -153,19 +203,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let pool = bankQuestions.filter(q => allowedDiffs.includes(Number(q.diff)));
 
-    if (pool.length < 30) {
+    if (pool.length < QUESTIONS_PER_LEVEL) {
       const fallback = bankQuestions.filter(q => Number(q.diff) <= Math.max(...allowedDiffs));
-      pool = fallback.length >= 30 ? fallback : bankQuestions.slice();
+      pool = fallback.length >= QUESTIONS_PER_LEVEL ? fallback : bankQuestions.slice();
     }
 
-    state.currentQuestions = pickRandomQuestions(pool, 30).map(q => shuffleQuestionOptions(q));
+    state.currentQuestions = pickRandomQuestions(pool, QUESTIONS_PER_LEVEL).map(q => shuffleQuestionOptions(q));
     state.answers = new Array(state.currentQuestions.length).fill(null);
     updateRightPanel();
   }
 
   function getSelectedBankQuestions() {
-    if (typeof QUESTION_BANKS === "undefined" || !Array.isArray(QUESTION_BANKS)) return [];
-    const bank = QUESTION_BANKS.find(b => b.name === state.selectedBank);
+    const bank = getBankByName(state.selectedBank);
     return bank && Array.isArray(bank.questions) ? bank.questions : [];
   }
 
@@ -256,7 +305,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateRightPanel() {
-    const total = state.currentQuestions.length || 30;
+    const total = state.currentQuestions.length || QUESTIONS_PER_LEVEL;
     const answered = state.answers.filter(a => a !== null).length;
     const currentNo = total ? state.currentIndex + 1 : 0;
     const progress = total ? (answered / total) * 100 : 0;
@@ -346,6 +395,12 @@ document.addEventListener("DOMContentLoaded", () => {
   function goNextLevel() {
     const next = clampLevel(state.currentLevel + 1);
     prepareLevel(next);
+
+    if (!state.currentQuestions.length) {
+      alert("下一關目前沒有足夠題目。");
+      return;
+    }
+
     switchScreen("quiz");
     startTimer();
     renderQuestion();
@@ -354,6 +409,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function retryLevel() {
     prepareLevel(state.currentLevel);
+
+    if (!state.currentQuestions.length) {
+      alert("本關目前沒有足夠題目。");
+      return;
+    }
+
     switchScreen("quiz");
     startTimer();
     renderQuestion();
@@ -401,6 +462,18 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    const bankObj = getBankByName(bank);
+    if (!bankObj || !isBankAvailable(bankObj)) {
+      if (els.playerDisplay) els.playerDisplay.textContent = name || "-";
+      if (els.levelDisplay) els.levelDisplay.textContent = "未開放";
+      if (els.highestScoreDisplay) els.highestScoreDisplay.textContent = "0";
+      if (els.latestScoreDisplay) els.latestScoreDisplay.textContent = "0";
+      if (els.clearedLevelsDisplay) els.clearedLevelsDisplay.textContent = "0";
+      renderLevelScores(null);
+      renderLevelMap(0);
+      return;
+    }
+
     const rec = getPlayerData(name, bank);
     if (els.playerDisplay) els.playerDisplay.textContent = name;
     if (els.levelDisplay) els.levelDisplay.textContent = `LV ${clampLevel((rec.clearedLevels || 0) + 1)}`;
@@ -432,7 +505,7 @@ document.addEventListener("DOMContentLoaded", () => {
     for (let i = 1; i <= 10; i++) {
       const div = document.createElement("div");
       div.className = "level-score-item";
-      div.textContent = `第 ${i} 關：${scores[i] !== undefined ? scores[i] + "/30" : "-"}`;
+      div.textContent = `第 ${i} 關：${scores[i] !== undefined ? scores[i] + "/" + QUESTIONS_PER_LEVEL : "-"}`;
       els.leftLevelScores.appendChild(div);
     }
   }
