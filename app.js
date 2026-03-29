@@ -385,12 +385,19 @@ function askSubmitOnLastQuestion() {
   }, 180);
 }
 
-function getDifficultyTarget(level) {
-  if (level <= 10) return [1];
-  if (level <= 20) return [1, 2];
-  if (level <= 30) return [2];
-  if (level <= 40) return [2, 3, 4];
-  return [3, 4, 5];
+function getDifficultyByLevel(level) {
+  if (level <= 5) return [1, 2];
+  if (level <= 10) return [2, 3];
+  if (level <= 15) return [3, 4];
+  if (level <= 20) return [4, 5];
+  if (level <= 25) return [5, 6];
+  if (level <= 30) return [6, 7];
+  if (level <= 35) return [7, 8];
+  if (level <= 40) return [8, 9];
+  if (level <= 45) return [9];
+  return [9, 10];
+}
+
 }
 
 function buildQuestionsForLevel(allQuestions, level) {
