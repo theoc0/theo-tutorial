@@ -7,114 +7,159 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+
   <div class="app-shell">
     <header class="topbar">
       <div class="brand">
-        <h1>中文闖關遊戲</h1>
-        <p>50關挑戰｜每關30題｜全對通關</p>
+        <div class="brand-badge">中</div>
+        <div>
+          <h1>中文闖關遊戲</h1>
+          <p>50 關挑戰｜每關 30 題｜錯題解析</p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="mini-chip" id="bankLabelTop">尚未選擇題庫</div>
+        <div class="mini-chip" id="levelLabelTop">第 1 關</div>
       </div>
     </header>
 
-    <section id="startScreen" class="screen start-screen">
-      <div class="card setup-card">
-        <h2>開始闖關</h2>
+    <main class="layout">
+      <aside class="sidebar card">
+        <section class="panel">
+          <h2 class="panel-title">開始挑戰</h2>
 
-        <div class="form-group">
-          <label for="studentName">學生姓名</label>
-          <input id="studentName" type="text" placeholder="請輸入姓名" />
-        </div>
+          <label class="field-label" for="bankSelect">選擇題庫</label>
+          <select id="bankSelect" class="select"></select>
 
-        <div class="form-group">
-          <label for="bankSelect">選擇題庫</label>
-          <select id="bankSelect"></select>
-        </div>
-
-        <div class="setup-actions">
-          <button id="startBtn" class="btn btn-primary">開始闖關</button>
-          <button id="resetBtn" class="btn btn-outline">重新開始</button>
-        </div>
-
-        <div class="start-panel-grid">
-          <div class="card side-card">
-            <h3>玩家資訊</h3>
-            <div class="stat-list">
-              <div class="stat-row"><span>玩家</span><strong id="playerDisplay">-</strong></div>
-              <div class="stat-row"><span>目前關卡</span><strong id="levelDisplay">LV 1</strong></div>
-              <div class="stat-row"><span>最高分</span><strong id="highestScoreDisplay">0</strong></div>
-              <div class="stat-row"><span>最新分數</span><strong id="latestScoreDisplay">0</strong></div>
-              <div class="stat-row"><span>已通關數</span><strong id="clearedLevelsDisplay">0</strong></div>
+          <div class="stats-grid">
+            <div class="stat-box">
+              <span class="stat-label">目前關卡</span>
+              <span class="stat-value" id="currentLevelDisplay">1</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">每關題數</span>
+              <span class="stat-value">30</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">總關卡</span>
+              <span class="stat-value">50</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">作答進度</span>
+              <span class="stat-value"><span id="answeredCount">0</span>/30</span>
             </div>
           </div>
 
-          <div class="card side-card">
-            <h3>前十關成績</h3>
-            <div id="leftLevelScores" class="level-score-list"></div>
+          <div class="sidebar-actions">
+            <button id="startBtn" class="btn btn-primary">開始本關</button>
+            <button id="restartBtn" class="btn btn-secondary">重新抽題</button>
+          </div>
+
+          <div class="tips-box">
+            <h3>規則說明</h3>
+            <ul>
+              <li>每關固定 30 題。</li>
+              <li>會依題目 <code>diff</code> 分層抽題。</li>
+              <li>題庫少於 30 題時，此關顯示未開放。</li>
+              <li>交卷後只顯示錯題解析。</li>
+            </ul>
+          </div>
+        </section>
+      </aside>
+
+      <section class="content">
+        <div id="welcomeCard" class="card hero-card">
+          <div class="hero-inner">
+            <div class="hero-text">
+              <span class="hero-tag">闖關模式</span>
+              <h2>選擇題庫後開始作答</h2>
+              <p>
+                系統會依關卡難度自動抽出 30 題。完成後可立即查看分數，並只顯示你答錯的題目與解釋，方便集中複習。
+              </p>
+              <div class="hero-points">
+                <span>✔ 依難度抽題</span>
+                <span>✔ 自動計分</span>
+                <span>✔ 錯題解析</span>
+              </div>
+            </div>
+            <div class="hero-side">
+              <div class="hero-orb">
+                <span>30</span>
+                <small>題 / 關</small>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="card map-card">
-          <h3>關卡地圖</h3>
-          <div id="levelMap" class="level-map"></div>
-        </div>
-      </div>
-    </section>
-
-    <section id="quizScreen" class="screen quiz-screen">
-      <aside class="card left-panel">
-        <h3>玩家資訊</h3>
-        <div class="stat-list">
-          <div class="stat-row"><span>玩家</span><strong id="playerDisplay">-</strong></div>
-          <div class="stat-row"><span>目前關卡</span><strong id="levelDisplay">LV 1</strong></div>
-          <div class="stat-row"><span>最高分</span><strong id="highestScoreDisplay">0</strong></div>
-          <div class="stat-row"><span>最新分數</span><strong id="latestScoreDisplay">0</strong></div>
-          <div class="stat-row"><span>已通關數</span><strong id="clearedLevelsDisplay">0</strong></div>
+        <div id="notOpenCard" class="card state-card hidden">
+          <div class="state-icon">🔒</div>
+          <h2>此關未開放</h2>
+          <p>目前題庫題數不足 30 題，無法開始本關。</p>
         </div>
 
-        <h3 class="mt">前十關成績</h3>
-        <div id="leftLevelScores" class="level-score-list"></div>
+        <div id="quizCard" class="card hidden">
+          <div class="section-head">
+            <div>
+              <h2>本關題目</h2>
+              <p id="quizSubtitle">請完成 30 題後交卷</p>
+            </div>
+            <div class="progress-pill">
+              <span id="progressText">0 / 30 已作答</span>
+            </div>
+          </div>
 
-        <h3 class="mt">關卡地圖</h3>
-        <div id="levelMap" class="level-map compact"></div>
-      </aside>
+          <form id="quizForm" class="quiz-list"></form>
 
-      <main class="card quiz-main">
-        <div class="quiz-meta">
-          <div id="questionCounter" class="meta-chip">第 1 / 30 題</div>
-          <div id="progressText" class="meta-chip">已作答 0 / 30</div>
-          <div id="timerDisplay" class="meta-chip">00:00</div>
+          <div class="bottom-actions">
+            <button id="submitBtn" class="btn btn-primary btn-large" type="button">交卷</button>
+          </div>
         </div>
 
-        <div class="progress-bar">
-          <div id="progressFill" class="progress-fill"></div>
-        </div>
+        <div id="resultCard" class="card hidden">
+          <div class="section-head">
+            <div>
+              <h2>本關結果</h2>
+              <p>只顯示答錯題目的答案與解釋</p>
+            </div>
+            <div class="score-badge" id="scoreBadge">0 分</div>
+          </div>
 
-        <div class="question-box">
-          <h2 id="questionText">題目將顯示在這裡</h2>
-          <div id="optionsWrap" class="options-wrap"></div>
-        </div>
+          <div class="result-grid">
+            <div class="result-box">
+              <span class="result-label">答對</span>
+              <span class="result-value" id="correctCount">0</span>
+            </div>
+            <div class="result-box">
+              <span class="result-label">答錯</span>
+              <span class="result-value" id="wrongCount">0</span>
+            </div>
+            <div class="result-box">
+              <span class="result-label">正確率</span>
+              <span class="result-value" id="accuracyText">0%</span>
+            </div>
+            <div class="result-box">
+              <span class="result-label">目前關卡</span>
+              <span class="result-value" id="resultLevelText">1</span>
+            </div>
+          </div>
 
-        <div class="quiz-actions">
-          <button id="prevBtn" class="btn btn-outline">上一題</button>
-          <button id="nextBtn" class="btn btn-outline">下一題</button>
-          <button id="submitBtn" class="btn btn-primary">交卷</button>
-        </div>
-      </main>
-    </section>
+          <div class="result-actions">
+            <button id="nextLevelBtn" class="btn btn-primary">下一關</button>
+            <button id="retryBtn" class="btn btn-secondary">重玩本關</button>
+          </div>
 
-    <section id="resultScreen" class="screen result-screen">
-      <div class="card result-card">
-        <h2 id="resultTitle">結果</h2>
-        <p id="scoreText" class="result-score">得分：0 / 30</p>
-        <p id="starText" class="result-stars">☆☆☆☆☆</p>
-        <p id="resultMessage" class="result-message">結果訊息</p>
-
-        <div class="result-actions">
-          <button id="nextLevelBtn" class="btn btn-primary">挑戰下一關</button>
-          <button id="retryLevelBtn" class="btn btn-warning">重闖本關</button>
-          <button class="btn btn-outline" onclick="location.reload()">返回首頁</button>
+          <div class="review-section">
+            <div class="review-head">
+              <h3>錯題解析</h3>
+              <span class="review-tip">只列出答錯的題目</span>
+            </div>
+            <div id="reviewWrap" class="review-wrap"></div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </main>
   </div>
 
   <script src="bank-cts3.js"></script>
