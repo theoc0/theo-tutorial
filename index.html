@@ -7,46 +7,53 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="bg-glow bg-glow-1"></div>
-  <div class="bg-glow bg-glow-2"></div>
+  <div class="grain"></div>
 
   <div class="app-shell">
     <header class="topbar">
-      <div class="brand">
-        <div class="brand-badge">中</div>
-        <div>
+      <div class="brand-wrap">
+        <div class="brand-mark">中</div>
+        <div class="brand-text">
+          <p class="brand-kicker">Chinese Quiz Adventure</p>
           <h1>中文闖關遊戲</h1>
-          <p>50 關挑戰｜每關 30 題｜錯題解析</p>
+          <p class="brand-sub">50 關挑戰｜每關 30 題｜只顯示錯題解析</p>
         </div>
       </div>
-      <div class="topbar-right">
-        <div class="mini-chip" id="bankLabelTop">尚未選擇題庫</div>
-        <div class="mini-chip" id="levelLabelTop">第 1 關</div>
+
+      <div class="top-pill-group">
+        <div class="top-pill" id="bankLabelTop">尚未選擇題庫</div>
+        <div class="top-pill" id="levelLabelTop">第 1 關</div>
       </div>
     </header>
 
-    <main class="layout">
+    <main class="main-layout">
       <aside class="sidebar card">
-        <section class="panel">
-          <h2 class="panel-title">開始挑戰</h2>
+        <div class="sidebar-inner">
+          <div class="sidebar-title-row">
+            <div>
+              <p class="section-kicker">Stage Panel</p>
+              <h2>開始挑戰</h2>
+            </div>
+            <div class="tiny-badge">A/B/C/D</div>
+          </div>
 
           <label class="field-label" for="bankSelect">選擇題庫</label>
           <select id="bankSelect" class="select"></select>
 
-          <div class="stats-grid">
-            <div class="stat-box">
+          <div class="stat-grid">
+            <div class="stat-card accent-orange">
               <span class="stat-label">目前關卡</span>
               <span class="stat-value" id="currentLevelDisplay">1</span>
             </div>
-            <div class="stat-box">
+            <div class="stat-card accent-green">
+              <span class="stat-label">目前題庫最高通關</span>
+              <span class="stat-value" id="highestPassedLevel">0</span>
+            </div>
+            <div class="stat-card accent-cream">
               <span class="stat-label">每關題數</span>
               <span class="stat-value">30</span>
             </div>
-            <div class="stat-box">
-              <span class="stat-label">總關卡</span>
-              <span class="stat-value">50</span>
-            </div>
-            <div class="stat-box">
+            <div class="stat-card accent-dark">
               <span class="stat-label">作答進度</span>
               <span class="stat-value"><span id="answeredCount">0</span>/30</span>
             </div>
@@ -57,73 +64,103 @@
             <button id="restartBtn" class="btn btn-secondary">重新抽題</button>
           </div>
 
-          <div class="tips-box">
+          <div class="rule-box">
             <h3>規則說明</h3>
             <ul>
               <li>每關固定 30 題。</li>
-              <li>會依題目 <code>diff</code> 分層抽題。</li>
-              <li>題庫少於 30 題時，此關顯示未開放。</li>
-              <li>交卷後只顯示錯題解析。</li>
+              <li>答對率達 <strong>70%</strong> 才可進下一關。</li>
+              <li>交卷後自動捲到結果區。</li>
+              <li>只顯示錯題的答案與解釋。</li>
+              <li>關卡進度會保留在瀏覽器中。</li>
             </ul>
           </div>
-        </section>
+        </div>
       </aside>
 
-      <section class="content">
-        <div id="welcomeCard" class="card hero-card">
-          <div class="hero-inner">
-            <div class="hero-text">
-              <span class="hero-tag">闖關模式</span>
-              <h2>選擇題庫後開始作答</h2>
-              <p>
-                系統會依關卡難度自動抽出 30 題。完成後可立即查看分數，並只顯示你答錯的題目與解釋，方便集中複習。
+      <section class="content-area">
+        <section id="welcomeCard" class="hero card">
+          <div class="hero-grid">
+            <div class="hero-copy">
+              <p class="section-kicker">UI Color Mood</p>
+              <h2>配色走暖米色、橘紅、墨綠與深黑風格</h2>
+              <p class="hero-desc">
+                依照你提供的風格方向，頁面改為溫暖紙感與卡片式介面。選擇題庫後即可開始挑戰，交卷後會集中顯示錯題解析，方便針對弱點複習。
               </p>
-              <div class="hero-points">
-                <span>✔ 依難度抽題</span>
-                <span>✔ 自動計分</span>
-                <span>✔ 錯題解析</span>
+
+              <div class="hero-tags">
+                <span>暖米色主題</span>
+                <span>卡片式排版</span>
+                <span>錯題解析</span>
               </div>
             </div>
-            <div class="hero-side">
-              <div class="hero-orb">
-                <span>30</span>
-                <small>題 / 關</small>
+
+            <div class="hero-visual">
+              <div class="mock-card mock-left">
+                <div class="mock-top"></div>
+                <div class="mock-title short"></div>
+                <div class="mock-image orange"></div>
+                <div class="mock-dots">
+                  <span></span><span></span><span></span>
+                </div>
+              </div>
+
+              <div class="mock-card mock-mid">
+                <div class="mock-top"></div>
+                <div class="mock-vertical">RECORDS</div>
+                <div class="mock-play"></div>
+              </div>
+
+              <div class="mock-card mock-right">
+                <div class="mock-top"></div>
+                <div class="mock-line"></div>
+                <div class="mock-list">
+                  <span></span><span></span><span></span><span></span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        <div id="notOpenCard" class="card state-card hidden">
-          <div class="state-icon">🔒</div>
+        <section id="notOpenCard" class="state-card card hidden">
+          <div class="state-emoji">🔒</div>
           <h2>此關未開放</h2>
           <p>目前題庫題數不足 30 題，無法開始本關。</p>
-        </div>
+        </section>
 
-        <div id="quizCard" class="card hidden">
+        <section id="quizCard" class="quiz-card card hidden">
           <div class="section-head">
             <div>
+              <p class="section-kicker">Quiz Area</p>
               <h2>本關題目</h2>
-              <p id="quizSubtitle">請完成 30 題後交卷</p>
+              <p id="quizSubtitle" class="section-sub">請完成 30 題後交卷</p>
             </div>
-            <div class="progress-pill">
+
+            <div class="progress-badge">
               <span id="progressText">0 / 30 已作答</span>
             </div>
           </div>
 
           <form id="quizForm" class="quiz-list"></form>
 
-          <div class="bottom-actions">
+          <div class="quiz-actions">
             <button id="submitBtn" class="btn btn-primary btn-large" type="button">交卷</button>
           </div>
-        </div>
+        </section>
 
-        <div id="resultCard" class="card hidden">
+        <section id="resultCard" class="result-card card hidden">
           <div class="section-head">
             <div>
+              <p class="section-kicker">Result Review</p>
               <h2>本關結果</h2>
-              <p>只顯示答錯題目的答案與解釋</p>
+              <p class="section-sub">只顯示答錯題目的答案與解釋</p>
             </div>
+
             <div class="score-badge" id="scoreBadge">0 分</div>
+          </div>
+
+          <div class="pass-banner" id="passBanner">
+            <span class="pass-banner-label">過關狀態</span>
+            <strong id="passStatusText">未判定</strong>
           </div>
 
           <div class="result-grid">
@@ -150,18 +187,17 @@
             <button id="retryBtn" class="btn btn-secondary">重玩本關</button>
           </div>
 
-          <div class="review-section">
+          <div class="review-panel">
             <div class="review-head">
               <h3>錯題解析</h3>
-              <span class="review-tip">只列出答錯的題目</span>
+              <span>只列出答錯題目</span>
             </div>
             <div id="reviewWrap" class="review-wrap"></div>
           </div>
-        </div>
+        </section>
       </section>
     </main>
   </div>
-
   <script src="bank-cts3.js"></script>
   <script src="bank-jt3.js"></script>
   <script src="bank-dse6.js"></script>
