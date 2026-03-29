@@ -2,7 +2,7 @@ const TOTAL_LEVELS = 50;
 const QUESTIONS_PER_LEVEL = 30;
 const OPTION_KEYS = ["A", "B", "C", "D"];
 const PASS_ACCURACY = 70;
-const STORAGE_KEY = "chinese_quiz_progress_v1";
+const STORAGE_KEY = "chinese_quiz_progress_v2";
 
 const bankSelect = document.getElementById("bankSelect");
 const startBtn = document.getElementById("startBtn");
@@ -20,6 +20,7 @@ const quizForm = document.getElementById("quizForm");
 const reviewWrap = document.getElementById("reviewWrap");
 
 const currentLevelDisplay = document.getElementById("currentLevelDisplay");
+const highestPassedLevel = document.getElementById("highestPassedLevel");
 const answeredCount = document.getElementById("answeredCount");
 const progressText = document.getElementById("progressText");
 const quizSubtitle = document.getElementById("quizSubtitle");
@@ -32,6 +33,9 @@ const resultLevelText = document.getElementById("resultLevelText");
 
 const bankLabelTop = document.getElementById("bankLabelTop");
 const levelLabelTop = document.getElementById("levelLabelTop");
+
+const passBanner = document.getElementById("passBanner");
+const passStatusText = document.getElementById("passStatusText");
 
 let currentLevel = 1;
 let currentBank = null;
@@ -46,6 +50,7 @@ function init() {
   bindEvents();
   updateTopInfo();
   updateLevelDisplay();
+  updateHighestPassedDisplay();
 }
 
 function bindEvents() {
@@ -55,20 +60,17 @@ function bindEvents() {
     loadBankProgress();
     updateTopInfo();
     updateLevelDisplay();
+    updateHighestPassedDisplay();
     resetView();
   });
 
   startBtn.addEventListener("click", () => {
-    if (!currentBank) {
-      currentBank = getBankById(bankSelect.value);
-    }
+    if (!currentBank) currentBank = getBankById(bankSelect.value);
     startLevel();
   });
 
   restartBtn.addEventListener("click", () => {
-    if (!currentBank) {
-      currentBank = getBankById(bankSelect.value);
-    }
+    if (!currentBank) currentBank = getBankById(bankSelect.value);
     startLevel();
   });
 
@@ -76,13 +78,14 @@ function bindEvents() {
 
   nextLevelBtn.addEventListener("click", () => {
     if (!lastResult || !lastResult.passed) return;
-    if (currentLevel < TOTAL_LEVELS) {
-      currentLevel += 1;
-      saveProgress();
-      updateLevelDisplay();
-      updateTopInfo();
-      startLevel();
-    }
+    if (currentLevel >= TOTAL_LEVELS) return;
+
+    currentLevel += 1;
+    saveProgress();
+    updateLevelDisplay();
+    updateTopInfo();
+    updateHighestPassedDisplay();
+    startLevel();
   });
 
   retryBtn.addEventListener("click", () => {
@@ -131,6 +134,10 @@ function updateLevelDisplay() {
   currentLevelDisplay.textContent = currentLevel;
 }
 
+function updateHighestPassedDisplay() {
+  highestPassedLevel.textContent = getCurrentHighestPassedLevel();
+}
+
 function resetView() {
   welcomeCard.classList.remove("hidden");
   notOpenCard.classList.add("hidden");
@@ -142,6 +149,8 @@ function resetView() {
   lastResult = null;
   answeredCount.textContent = "0";
   progressText.textContent = `0 / ${QUESTIONS_PER_LEVEL} 已作答`;
+  passBanner.className = "pass-banner";
+  passStatusText.textContent = "未判定";
 }
 
 function startLevel() {
@@ -175,7 +184,7 @@ function startLevel() {
 
   setTimeout(() => {
     quizCard.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, 50);
+  }, 60);
 }
 
 function generateLevelQuestions(allQuestions, level, count) {
@@ -218,7 +227,14 @@ function getLevelPlan(level) {
 }
 
 function isValidQuestion(q) {
-  return q && q.q && Array.isArray(q.opts) && q.opts.length >= 2 && q.ans !== undefined;
+  return (
+    q &&
+    q.q &&
+    Array.isArray(q.opts) &&
+    q.opts.length === 4 &&
+    q.opts.every((opt) => typeof opt === "string") &&
+    q.ans !== undefined
+  );
 }
 
 function sampleQuestions(arr, n) {
@@ -293,7 +309,7 @@ function renderQuiz(questions) {
 
       const key = document.createElement("span");
       key.className = "option-key";
-      key.textContent = `${OPTION_KEYS[optIndex] || optIndex + 1}.`;
+      key.textContent = `${OPTION_KEYS[optIndex]}.`;
 
       const text = document.createElement("span");
       text.className = "option-text";
@@ -355,14 +371,19 @@ function submitQuiz() {
     passed
   };
 
+  if (passed) {
+    updateHighestPassedLevel(currentLevel);
+  }
+
   scoreBadge.textContent = `${score} 分`;
   correctCount.textContent = String(correct);
   wrongCount.textContent = String(wrong);
   accuracyText.textContent = `${accuracy.toFixed(1)}%`;
   resultLevelText.textContent = String(currentLevel);
 
+  updatePassBanner(passed, accuracy);
   renderWrongReviews(wrongItems);
-  updateResultActionState(passed, accuracy);
+  updateResultActionState(passed);
 
   quizCard.classList.add("hidden");
   notOpenCard.classList.add("hidden");
@@ -370,13 +391,23 @@ function submitQuiz() {
   resultCard.classList.remove("hidden");
 
   saveProgress();
+  updateHighestPassedDisplay();
 
   setTimeout(() => {
     resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
   }, 80);
 }
 
-function updateResultActionState(passed, accuracy) {
+function updatePassBanner(passed, accuracy) {
+  passBanner.className = `pass-banner ${passed ? "pass" : "fail"}`;
+  if (passed) {
+    passStatusText.textContent = `已過關｜正確率 ${accuracy.toFixed(1)}%`;
+  } else {
+    passStatusText.textContent = `未過關｜需達 ${PASS_ACCURACY}%（目前 ${accuracy.toFixed(1)}%）`;
+  }
+}
+
+function updateResultActionState(passed) {
   if (passed) {
     nextLevelBtn.disabled = currentLevel >= TOTAL_LEVELS;
     nextLevelBtn.textContent = currentLevel >= TOTAL_LEVELS ? "已完成全部關卡" : "下一關";
@@ -459,7 +490,7 @@ function renderWrongReviews(wrongItems) {
 function formatAnswerText(question, index) {
   if (index === -1) return "未作答";
   if (!question || !Array.isArray(question.opts) || index < 0 || index >= question.opts.length) return "無法判定";
-  return `${OPTION_KEYS[index] || index + 1}. ${question.opts[index]}`;
+  return `${OPTION_KEYS[index]}. ${question.opts[index]}`;
 }
 
 function saveProgress() {
@@ -470,8 +501,12 @@ function saveProgress() {
 
   data.selectedBankId = bankId;
   data.banks = data.banks || {};
+
+  const oldBankData = data.banks[bankId] || {};
+
   data.banks[bankId] = {
     currentLevel,
+    highestPassedLevel: Math.max(oldBankData.highestPassedLevel || 0, getCurrentHighestPassedLevel()),
     lastResult: lastResult || null
   };
 
@@ -497,6 +532,7 @@ function restoreProgress() {
 function loadBankProgress() {
   if (!currentBank) {
     currentLevel = 1;
+    lastResult = null;
     return;
   }
 
@@ -533,6 +569,31 @@ function getCurrentBankId() {
   if (!currentBank) return "";
   const fallbackIndex = QUESTION_BANKS.indexOf(currentBank);
   return currentBank.id || `bank_${fallbackIndex}`;
+}
+
+function getCurrentHighestPassedLevel() {
+  if (!currentBank) return 0;
+  const data = readProgressData();
+  const bankId = getCurrentBankId();
+  return (data.banks && data.banks[bankId] && data.banks[bankId].highestPassedLevel) || 0;
+}
+
+function updateHighestPassedLevel(level) {
+  if (!currentBank) return;
+  const data = readProgressData();
+  const bankId = getCurrentBankId();
+
+  data.selectedBankId = bankId;
+  data.banks = data.banks || {};
+  data.banks[bankId] = data.banks[bankId] || {};
+
+  data.banks[bankId].highestPassedLevel = Math.max(data.banks[bankId].highestPassedLevel || 0, level);
+
+  if (!data.banks[bankId].currentLevel || data.banks[bankId].currentLevel < currentLevel) {
+    data.banks[bankId].currentLevel = currentLevel;
+  }
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
 function escapeHtml(str) {
