@@ -1,16 +1,3 @@
-// app.js
-// 中文闖關遊戲：只需姓名、50關、每關抽30題、全對通關、重考重新抽題
-// 配合 question-banks.js 使用
-// 需要 index.html 內有以下 id：
-// studentName, bankSelect, startBtn, submitBtn, resetBtn, prevBtn, nextBtn,
-// nextLevelBtn, retryLevelBtn,
-// startScreen, quizScreen, resultScreen,
-// playerDisplay, levelDisplay, highestScoreDisplay, latestScoreDisplay, clearedLevelsDisplay,
-// leftLevelScores, levelMap,
-// questionCounter, progressText, timerDisplay, progressFill,
-// questionText, optionsWrap,
-// resultTitle, scoreText, starText, resultMessage
-
 const STORAGE_KEY = "cn_game_records_v3";
 const QUESTIONS_PER_LEVEL = 30;
 const MIN_BANK_QUESTIONS = 30;
@@ -83,6 +70,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (els.nextBtn) els.nextBtn.addEventListener("click", goNextQuestion);
     if (els.nextLevelBtn) els.nextLevelBtn.addEventListener("click", goNextLevel);
     if (els.retryLevelBtn) els.retryLevelBtn.addEventListener("click", retryLevel);
+
+    if (els.studentName) els.studentName.addEventListener("input", renderStartPanel);
+    if (els.bankSelect) els.bankSelect.addEventListener("change", renderStartPanel);
   }
 
   function populateBankSelect() {
@@ -99,32 +89,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     QUESTION_BANKS.forEach((bank, i) => {
       const opt = document.createElement("option");
-      const total = Array.isArray(bank.questions) ? bank.questions.length : 0;
       const available = isBankAvailable(bank);
-
       opt.value = bank.name;
-      opt.textContent = available
-        ? bank.name
-        : `${bank.name}（未開放）`;
-
-      opt.dataset.available = available ? "1" : "0";
-
-      if (!available) {
-        opt.disabled = true;
-      }
-
-      if (i === 0 && available) {
-        opt.selected = true;
-      }
-
+      opt.textContent = available ? bank.name : `${bank.name}（未開放）`;
+      opt.disabled = !available;
+      if (i === 0 && available) opt.selected = true;
       els.bankSelect.appendChild(opt);
     });
 
-    // 若第一個剛好是 disabled，改選第一個可用題庫
-    const firstAvailable = [...els.bankSelect.options].find(opt => !opt.disabled);
-    if (firstAvailable) {
-      firstAvailable.selected = true;
-    }
+    const firstAvailable = [...els.bankSelect.options].find(o => !o.disabled);
+    if (firstAvailable) firstAvailable.selected = true;
   }
 
   function isBankAvailable(bank) {
@@ -132,7 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function getBankByName(name) {
-    if (typeof QUESTION_BANKS === "undefined" || !Array.isArray(QUESTION_BANKS)) return null;
+    if (!Array.isArray(QUESTION_BANKS)) return null;
     return QUESTION_BANKS.find(b => b.name === name) || null;
   }
 
@@ -153,14 +127,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const bankObj = getBankByName(bank);
-    if (!bankObj) {
-      alert("找不到所選題庫。");
-      return null;
-    }
-
-    if (!isBankAvailable(bankObj)) {
+    if (!bankObj || !isBankAvailable(bankObj)) {
       alert("此題庫題目不足 30 題，暫未開放。");
-      if (els.bankSelect) els.bankSelect.focus();
       return null;
     }
 
@@ -395,12 +363,10 @@ document.addEventListener("DOMContentLoaded", () => {
   function goNextLevel() {
     const next = clampLevel(state.currentLevel + 1);
     prepareLevel(next);
-
     if (!state.currentQuestions.length) {
       alert("下一關目前沒有足夠題目。");
       return;
     }
-
     switchScreen("quiz");
     startTimer();
     renderQuestion();
@@ -409,12 +375,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function retryLevel() {
     prepareLevel(state.currentLevel);
-
     if (!state.currentQuestions.length) {
       alert("本關目前沒有足夠題目。");
       return;
     }
-
     switchScreen("quiz");
     startTimer();
     renderQuestion();
@@ -451,6 +415,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderStartPanel() {
     const name = els.studentName ? els.studentName.value.trim() : "";
     const bank = els.bankSelect ? els.bankSelect.value : "";
+
     if (!name || !bank) {
       if (els.playerDisplay) els.playerDisplay.textContent = "-";
       if (els.levelDisplay) els.levelDisplay.textContent = "LV 1";
@@ -464,7 +429,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const bankObj = getBankByName(bank);
     if (!bankObj || !isBankAvailable(bankObj)) {
-      if (els.playerDisplay) els.playerDisplay.textContent = name || "-";
+      if (els.playerDisplay) els.playerDisplay.textContent = name;
       if (els.levelDisplay) els.levelDisplay.textContent = "未開放";
       if (els.highestScoreDisplay) els.highestScoreDisplay.textContent = "0";
       if (els.latestScoreDisplay) els.latestScoreDisplay.textContent = "0";
@@ -561,7 +526,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function loadRecords() {
     try {
       return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-    } catch (e) {
+    } catch {
       return {};
     }
   }
@@ -579,13 +544,5 @@ document.addEventListener("DOMContentLoaded", () => {
       const j = Math.floor(Math.random() * (i + 1));
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
-  }
-
-  if (els.studentName) {
-    els.studentName.addEventListener("input", renderStartPanel);
-  }
-
-  if (els.bankSelect) {
-    els.bankSelect.addEventListener("change", renderStartPanel);
   }
 });
