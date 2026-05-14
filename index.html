@@ -16,7 +16,7 @@
         <div class="brand-mark">中</div>
         <div class="brand-text">
           <h1>中文闖關遊戲</h1>
-          <p class="brand-sub">50 關挑戰｜每關 30 題｜只顯示錯題解析</p>
+          <p class="brand-sub">50 關挑戰｜每關 30 題｜10 層難度｜只顯示錯題解析</p>
         </div>
       </div>
 
@@ -34,14 +34,20 @@
           </div>
 
           <label class="field-label" for="playerNameInput">闖關角色名字</label>
-          <input id="playerNameInput" class="text-input" type="text" placeholder="請輸入角色名字" maxlength="20" />
+          <input
+            id="playerNameInput"
+            class="text-input"
+            type="text"
+            placeholder="請輸入角色名字"
+            maxlength="20"
+          />
 
           <label class="field-label" for="bankSelect">選擇題庫</label>
           <select id="bankSelect" class="select"></select>
 
           <div class="sidebar-actions">
-            <button id="startBtn" class="btn btn-primary">開始本關</button>
-            <button id="restartBtn" class="btn btn-secondary">重新抽題</button>
+            <button id="startBtn" class="btn btn-primary" type="button">開始本關</button>
+            <button id="restartBtn" class="btn btn-secondary" type="button">重新抽題</button>
           </div>
         </section>
 
@@ -84,6 +90,8 @@
             <h3>規則說明</h3>
             <ul>
               <li>每關固定 30 題。</li>
+              <li>全站採 10 層難度配置。</li>
+              <li>第 1～5 關對應第 1 層難度，依序提升。</li>
               <li>答對率達 <strong>70%</strong> 才可進下一關。</li>
               <li>交卷後自動捲到結果區。</li>
               <li>只顯示錯題解析。</li>
@@ -98,11 +106,12 @@
           <div class="hero-content">
             <h2>準備開始你的中文闖關挑戰</h2>
             <p class="hero-text">
-              選擇題庫並輸入角色名字後即可開始。系統會依關卡難度抽出 30 題，
-              完成後只顯示錯題解析，讓你更有效率地複習。
+              選擇題庫並輸入角色名字後即可開始。系統會依關卡對應的 10 層難度抽出 30 題，
+              完成後只顯示錯題解析，方便你集中複習弱點。
             </p>
             <div class="hero-tags">
-              <span>暖米色介面</span>
+              <span>啟思版下學期考試題庫</span>
+              <span>10 層難度</span>
               <span>四選一題型</span>
               <span>錯題複習</span>
               <span>闖關進度保存</span>
@@ -169,8 +178,8 @@
           </div>
 
           <div class="action-row">
-            <button id="nextLevelBtn" class="btn btn-primary">下一關</button>
-            <button id="retryBtn" class="btn btn-secondary">重玩本關</button>
+            <button id="nextLevelBtn" class="btn btn-primary" type="button">下一關</button>
+            <button id="retryBtn" class="btn btn-secondary" type="button">重玩本關</button>
           </div>
 
           <div class="review-panel">
@@ -230,6 +239,7 @@
   <script src="bank-cts3.js"></script>
   <script src="bank-jt3.js"></script>
   <script src="bank-dse6.js"></script>
+  <script src="bank-cts-sem2.js"></script>
   <script src="question-banks.js"></script>
   <script src="app.js"></script>
 </body>
