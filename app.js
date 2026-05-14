@@ -2,7 +2,7 @@ const TOTAL_LEVELS = 50;
 const QUESTIONS_PER_LEVEL = 30;
 const OPTION_KEYS = ["A", "B", "C", "D"];
 const PASS_ACCURACY = 70;
-const STORAGE_KEY = "chinese_quiz_progress_v11";
+const STORAGE_KEY = "chinese_quiz_progress_v12";
 
 const bankSelect = document.getElementById("bankSelect");
 const playerNameInput = document.getElementById("playerNameInput");
@@ -268,45 +268,69 @@ function generateLevelQuestions(allQuestions, level, count) {
 }
 
 function getQuestionPlanByLevel(level) {
-  if (level >= 1 && level <= 9) {
-    return { 1: 18, 2: 12 };
+  if (level >= 1 && level <= 5) {
+    return { 1: 20, 2: 10 };
   }
 
-  if (level >= 10 && level <= 19) {
-    return { 1: 10, 2: 14, 3: 6 };
+  if (level >= 6 && level <= 10) {
+    return { 1: 14, 2: 12, 3: 4 };
   }
 
-  if (level >= 20 && level <= 29) {
+  if (level >= 11 && level <= 15) {
+    return { 2: 18, 1: 6, 3: 6 };
+  }
+
+  if (level >= 16 && level <= 20) {
     return { 2: 12, 3: 12, 4: 6 };
   }
 
-  if (level >= 30 && level <= 39) {
+  if (level >= 21 && level <= 25) {
+    return { 3: 16, 2: 6, 4: 8 };
+  }
+
+  if (level >= 26 && level <= 30) {
     return { 3: 10, 4: 12, 5: 8 };
   }
 
-  if (level >= 40 && level <= 49) {
-    return { 4: 8, 5: 12, 6: 10 };
+  if (level >= 31 && level <= 35) {
+    return { 4: 16, 3: 6, 5: 8 };
   }
 
-  return { 5: 6, 6: 10, 7: 8, 8: 4, 9: 1, 10: 1 };
+  if (level >= 36 && level <= 40) {
+    return { 4: 10, 5: 12, 6: 8 };
+  }
+
+  if (level >= 41 && level <= 45) {
+    return { 5: 14, 6: 10, 4: 6 };
+  }
+
+  return { 6: 10, 7: 8, 8: 6, 9: 4, 10: 2 };
 }
 
 function getDifficultyLabelByLevel(level) {
-  if (level >= 1 && level <= 9) return "主抽難度 1–2";
-  if (level >= 10 && level <= 19) return "主抽難度 1–3";
-  if (level >= 20 && level <= 29) return "主抽難度 2–4";
-  if (level >= 30 && level <= 39) return "主抽難度 3–5";
-  if (level >= 40 && level <= 49) return "主抽難度 4–6";
-  return "主抽難度 5–10";
+  if (level >= 1 && level <= 5) return "主抽難度 1–2";
+  if (level >= 6 && level <= 10) return "主抽難度 1–3";
+  if (level >= 11 && level <= 15) return "主抽難度 1–3（偏 2）";
+  if (level >= 16 && level <= 20) return "主抽難度 2–4";
+  if (level >= 21 && level <= 25) return "主抽難度 2–4（偏 3）";
+  if (level >= 26 && level <= 30) return "主抽難度 3–5";
+  if (level >= 31 && level <= 35) return "主抽難度 3–5（偏 4）";
+  if (level >= 36 && level <= 40) return "主抽難度 4–6";
+  if (level >= 41 && level <= 45) return "主抽難度 4–6（偏 5）";
+  return "主抽難度 6–10";
 }
 
 function getFallbackDifficultyOrder(level) {
-  if (level >= 1 && level <= 9) return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-  if (level >= 10 && level <= 19) return [2, 1, 3, 4, 5, 6, 7, 8, 9, 10];
-  if (level >= 20 && level <= 29) return [3, 2, 4, 1, 5, 6, 7, 8, 9, 10];
-  if (level >= 30 && level <= 39) return [4, 3, 5, 2, 6, 1, 7, 8, 9, 10];
-  if (level >= 40 && level <= 49) return [5, 4, 6, 3, 7, 2, 8, 1, 9, 10];
-  return [6, 5, 7, 8, 4, 9, 10, 3, 2, 1];
+  if (level >= 1 && level <= 5) return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  if (level >= 6 && level <= 10) return [2, 1, 3, 4, 5, 6, 7, 8, 9, 10];
+  if (level >= 11 && level <= 15) return [2, 1, 3, 4, 5, 6, 7, 8, 9, 10];
+  if (level >= 16 && level <= 20) return [3, 2, 4, 1, 5, 6, 7, 8, 9, 10];
+  if (level >= 21 && level <= 25) return [3, 2, 4, 5, 1, 6, 7, 8, 9, 10];
+  if (level >= 26 && level <= 30) return [4, 3, 5, 2, 6, 1, 7, 8, 9, 10];
+  if (level >= 31 && level <= 35) return [4, 5, 3, 6, 2, 7, 1, 8, 9, 10];
+  if (level >= 36 && level <= 40) return [5, 4, 6, 3, 7, 2, 8, 1, 9, 10];
+  if (level >= 41 && level <= 45) return [5, 6, 4, 7, 3, 8, 2, 9, 1, 10];
+  return [6, 7, 8, 5, 9, 4, 10, 3, 2, 1];
 }
 
 function isValidQuestion(q) {
