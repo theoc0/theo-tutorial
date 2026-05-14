@@ -2,7 +2,7 @@ const TOTAL_LEVELS = 50;
 const QUESTIONS_PER_LEVEL = 30;
 const OPTION_KEYS = ["A", "B", "C", "D"];
 const PASS_ACCURACY = 70;
-const STORAGE_KEY = "chinese_quiz_progress_v3";
+const STORAGE_KEY = "chinese_quiz_progress_v10";
 
 const bankSelect = document.getElementById("bankSelect");
 const playerNameInput = document.getElementById("playerNameInput");
@@ -193,7 +193,15 @@ function startLevel() {
     return;
   }
 
-  const selectedQuestions = generateLevelQuestions(currentBank.questions, currentLevel, QUESTIONS_PER_LEVEL);
+  const validQuestions = currentBank.questions.filter(isValidQuestion);
+  if (validQuestions.length < QUESTIONS_PER_LEVEL) {
+    resetView();
+    welcomeCard.classList.add("hidden");
+    notOpenCard.classList.remove("hidden");
+    return;
+  }
+
+  const selectedQuestions = generateLevelQuestions(validQuestions, currentLevel, QUESTIONS_PER_LEVEL);
 
   if (!selectedQuestions || selectedQuestions.length < QUESTIONS_PER_LEVEL) {
     resetView();
@@ -212,7 +220,8 @@ function startLevel() {
   resultCard.classList.add("hidden");
   quizCard.classList.remove("hidden");
 
-  quizSubtitle.textContent = `${currentBank.name || "題庫"}｜第 ${currentLevel} 關｜請完成 ${QUESTIONS_PER_LEVEL} 題後交卷`;
+  const stageDifficulty = getDifficultyBandByLevel(currentLevel);
+  quizSubtitle.textContent = `${currentBank.name || "題庫"}｜第 ${currentLevel} 關｜第 ${stageDifficulty} 層難度｜請完成 ${QUESTIONS_PER_LEVEL} 題後交卷`;
 
   updateAnsweredProgress();
   startTimer();
@@ -223,42 +232,61 @@ function startLevel() {
 }
 
 function generateLevelQuestions(allQuestions, level, count) {
-  if (!Array.isArray(allQuestions) || allQuestions.length < count) return [];
+  const targetDiff = getDifficultyBandByLevel(level);
 
-  const normalized = allQuestions.filter(isValidQuestion);
+  const exact = allQuestions.filter((q) => Number(q.diff) === targetDiff);
 
-  if (normalized.length < count) return [];
+  let pool = [...exact];
 
-  const buckets = {
-    1: normalized.filter((q) => Number(q.diff) === 1),
-    2: normalized.filter((q) => Number(q.diff) === 2),
-    3: normalized.filter((q) => Number(q.diff) === 3)
-  };
-
-  const plan = getLevelPlan(level);
-  let result = [];
-
-  result = result.concat(sampleQuestions(buckets[1], plan[1]));
-  result = result.concat(sampleQuestions(buckets[2], plan[2]));
-  result = result.concat(sampleQuestions(buckets[3], plan[3]));
-
-  if (result.length < count) {
-    const usedSet = new Set(result.map((q) => getQuestionKey(q)));
-    const remain = normalized.filter((q) => !usedSet.has(getQuestionKey(q)));
-    result = result.concat(sampleQuestions(remain, count - result.length));
+  if (pool.length < count) {
+    const nearOrder = getNearbyDifficultyOrder(targetDiff);
+    nearOrder.forEach((diff) => {
+      const extra = allQuestions.filter((q) => Number(q.diff) === diff);
+      pool = pool.concat(extra);
+    });
   }
 
-  if (result.length < count) return [];
+  const deduped = dedupeQuestions(pool);
 
-  return shuffleArray(result).slice(0, count);
+  if (deduped.length < count) {
+    const fullDeduped = dedupeQuestions(allQuestions);
+    return shuffleArray(fullDeduped).slice(0, Math.min(count, fullDeduped.length));
+  }
+
+  return shuffleArray(deduped).slice(0, count);
 }
 
-function getLevelPlan(level) {
-  if (level <= 10) return { 1: 18, 2: 9, 3: 3 };
-  if (level <= 20) return { 1: 14, 2: 10, 3: 6 };
-  if (level <= 30) return { 1: 10, 2: 12, 3: 8 };
-  if (level <= 40) return { 1: 6, 2: 12, 3: 12 };
-  return { 1: 3, 2: 9, 3: 18 };
+function getDifficultyBandByLevel(level) {
+  if (level <= 5) return 1;
+  if (level <= 10) return 2;
+  if (level <= 15) return 3;
+  if (level <= 20) return 4;
+  if (level <= 25) return 5;
+  if (level <= 30) return 6;
+  if (level <= 35) return 7;
+  if (level <= 40) return 8;
+  if (level <= 45) return 9;
+  return 10;
+}
+
+function getNearbyDifficultyOrder(target) {
+  const order = [];
+  for (let offset = 1; offset <= 9; offset++) {
+    const lower = target - offset;
+    const upper = target + offset;
+    if (lower >= 1) order.push(lower);
+    if (upper <= 10) order.push(upper);
+  }
+  return order;
+}
+
+function dedupeQuestions(arr) {
+  const map = new Map();
+  arr.forEach((q) => {
+    const key = getQuestionKey(q);
+    if (!map.has(key)) map.set(key, q);
+  });
+  return [...map.values()];
 }
 
 function isValidQuestion(q) {
@@ -268,21 +296,19 @@ function isValidQuestion(q) {
     Array.isArray(q.opts) &&
     q.opts.length === 4 &&
     q.opts.every((opt) => typeof opt === "string") &&
-    q.ans !== undefined
+    q.ans !== undefined &&
+    Number(q.diff) >= 1 &&
+    Number(q.diff) <= 10
   );
 }
 
-function sampleQuestions(arr, n) {
-  if (!Array.isArray(arr) || arr.length === 0 || n <= 0) return [];
-  return shuffleArray([...arr]).slice(0, Math.min(n, arr.length));
-}
-
 function shuffleArray(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
+  const result = [...arr];
+  for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+    [result[i], result[j]] = [result[j], result[i]];
   }
-  return arr;
+  return result;
 }
 
 function getQuestionKey(q) {
@@ -315,7 +341,7 @@ function renderQuiz(questions) {
 
     const diffChip = document.createElement("span");
     diffChip.className = "q-chip";
-    diffChip.textContent = `難度 ${question.diff || "-"}`;
+    diffChip.textContent = `難度 ${question.diff}`;
     meta.appendChild(diffChip);
 
     titleWrap.appendChild(meta);
@@ -355,14 +381,14 @@ function renderQuiz(questions) {
 }
 
 function updateAnsweredProgress() {
-  let count = 0;
+  let answered = 0;
 
   currentQuestions.forEach((_, index) => {
     const checked = quizForm.querySelector(`input[name="question_${index}"]:checked`);
-    if (checked) count += 1;
+    if (checked) answered += 1;
   });
 
-  updateProgressUI(count);
+  updateProgressUI(answered);
 }
 
 function updateProgressUI(answeredCount) {
