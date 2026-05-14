@@ -2,7 +2,7 @@ const TOTAL_LEVELS = 50;
 const QUESTIONS_PER_LEVEL = 30;
 const OPTION_KEYS = ["A", "B", "C", "D"];
 const PASS_ACCURACY = 70;
-const STORAGE_KEY = "chinese_quiz_progress_v10";
+const STORAGE_KEY = "chinese_quiz_progress_v11";
 
 const bankSelect = document.getElementById("bankSelect");
 const playerNameInput = document.getElementById("playerNameInput");
@@ -220,8 +220,8 @@ function startLevel() {
   resultCard.classList.add("hidden");
   quizCard.classList.remove("hidden");
 
-  const stageDifficulty = getDifficultyBandByLevel(currentLevel);
-  quizSubtitle.textContent = `${currentBank.name || "題庫"}｜第 ${currentLevel} 關｜第 ${stageDifficulty} 層難度｜請完成 ${QUESTIONS_PER_LEVEL} 題後交卷`;
+  const planText = getDifficultyLabelByLevel(currentLevel);
+  quizSubtitle.textContent = `${currentBank.name || "題庫"}｜第 ${currentLevel} 關｜${planText}｜請完成 ${QUESTIONS_PER_LEVEL} 題後交卷`;
 
   updateAnsweredProgress();
   startTimer();
@@ -232,61 +232,81 @@ function startLevel() {
 }
 
 function generateLevelQuestions(allQuestions, level, count) {
-  const targetDiff = getDifficultyBandByLevel(level);
+  const plan = getQuestionPlanByLevel(level);
+  let picked = [];
 
-  const exact = allQuestions.filter((q) => Number(q.diff) === targetDiff);
+  Object.entries(plan).forEach(([diffStr, needCount]) => {
+    const diff = Number(diffStr);
+    const pool = allQuestions.filter((q) => Number(q.diff) === diff);
+    const sampled = sampleQuestions(pool, needCount);
+    picked = picked.concat(sampled);
+  });
 
-  let pool = [...exact];
+  if (picked.length < count) {
+    const usedSet = new Set(picked.map((q) => getQuestionKey(q)));
+    const fallbackOrder = getFallbackDifficultyOrder(level);
 
-  if (pool.length < count) {
-    const nearOrder = getNearbyDifficultyOrder(targetDiff);
-    nearOrder.forEach((diff) => {
-      const extra = allQuestions.filter((q) => Number(q.diff) === diff);
-      pool = pool.concat(extra);
+    fallbackOrder.forEach((diff) => {
+      if (picked.length >= count) return;
+      const extraPool = allQuestions.filter(
+        (q) => Number(q.diff) === diff && !usedSet.has(getQuestionKey(q))
+      );
+      const needed = count - picked.length;
+      const sampled = sampleQuestions(extraPool, needed);
+      sampled.forEach((q) => usedSet.add(getQuestionKey(q)));
+      picked = picked.concat(sampled);
     });
   }
 
-  const deduped = dedupeQuestions(pool);
-
-  if (deduped.length < count) {
-    const fullDeduped = dedupeQuestions(allQuestions);
-    return shuffleArray(fullDeduped).slice(0, Math.min(count, fullDeduped.length));
+  if (picked.length < count) {
+    const usedSet = new Set(picked.map((q) => getQuestionKey(q)));
+    const remain = allQuestions.filter((q) => !usedSet.has(getQuestionKey(q)));
+    picked = picked.concat(sampleQuestions(remain, count - picked.length));
   }
 
-  return shuffleArray(deduped).slice(0, count);
+  return shuffleArray(dedupeQuestions(picked)).slice(0, count);
 }
 
-function getDifficultyBandByLevel(level) {
-  if (level <= 5) return 1;
-  if (level <= 10) return 2;
-  if (level <= 15) return 3;
-  if (level <= 20) return 4;
-  if (level <= 25) return 5;
-  if (level <= 30) return 6;
-  if (level <= 35) return 7;
-  if (level <= 40) return 8;
-  if (level <= 45) return 9;
-  return 10;
-}
-
-function getNearbyDifficultyOrder(target) {
-  const order = [];
-  for (let offset = 1; offset <= 9; offset++) {
-    const lower = target - offset;
-    const upper = target + offset;
-    if (lower >= 1) order.push(lower);
-    if (upper <= 10) order.push(upper);
+function getQuestionPlanByLevel(level) {
+  if (level >= 1 && level <= 9) {
+    return { 1: 18, 2: 12 };
   }
-  return order;
+
+  if (level >= 10 && level <= 19) {
+    return { 1: 10, 2: 14, 3: 6 };
+  }
+
+  if (level >= 20 && level <= 29) {
+    return { 2: 12, 3: 12, 4: 6 };
+  }
+
+  if (level >= 30 && level <= 39) {
+    return { 3: 10, 4: 12, 5: 8 };
+  }
+
+  if (level >= 40 && level <= 49) {
+    return { 4: 8, 5: 12, 6: 10 };
+  }
+
+  return { 5: 6, 6: 10, 7: 8, 8: 4, 9: 1, 10: 1 };
 }
 
-function dedupeQuestions(arr) {
-  const map = new Map();
-  arr.forEach((q) => {
-    const key = getQuestionKey(q);
-    if (!map.has(key)) map.set(key, q);
-  });
-  return [...map.values()];
+function getDifficultyLabelByLevel(level) {
+  if (level >= 1 && level <= 9) return "主抽難度 1–2";
+  if (level >= 10 && level <= 19) return "主抽難度 1–3";
+  if (level >= 20 && level <= 29) return "主抽難度 2–4";
+  if (level >= 30 && level <= 39) return "主抽難度 3–5";
+  if (level >= 40 && level <= 49) return "主抽難度 4–6";
+  return "主抽難度 5–10";
+}
+
+function getFallbackDifficultyOrder(level) {
+  if (level >= 1 && level <= 9) return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  if (level >= 10 && level <= 19) return [2, 1, 3, 4, 5, 6, 7, 8, 9, 10];
+  if (level >= 20 && level <= 29) return [3, 2, 4, 1, 5, 6, 7, 8, 9, 10];
+  if (level >= 30 && level <= 39) return [4, 3, 5, 2, 6, 1, 7, 8, 9, 10];
+  if (level >= 40 && level <= 49) return [5, 4, 6, 3, 7, 2, 8, 1, 9, 10];
+  return [6, 5, 7, 8, 4, 9, 10, 3, 2, 1];
 }
 
 function isValidQuestion(q) {
@@ -300,6 +320,20 @@ function isValidQuestion(q) {
     Number(q.diff) >= 1 &&
     Number(q.diff) <= 10
   );
+}
+
+function sampleQuestions(arr, n) {
+  if (!Array.isArray(arr) || arr.length === 0 || n <= 0) return [];
+  return shuffleArray([...arr]).slice(0, Math.min(n, arr.length));
+}
+
+function dedupeQuestions(arr) {
+  const map = new Map();
+  arr.forEach((q) => {
+    const key = getQuestionKey(q);
+    if (!map.has(key)) map.set(key, q);
+  });
+  return [...map.values()];
 }
 
 function shuffleArray(arr) {
